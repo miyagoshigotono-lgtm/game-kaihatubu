@@ -22,7 +22,7 @@
       round: 1,
       digsLeft: 10,
       phase: 'dig',
-      map: [],
+      map: [], // 0:壁, 1:空間, 2:栄養源
       monsters: [],
       heroes: [],
       message: '魔王よ、地面を掘り、魔物の揺りかごを作れ'
@@ -52,13 +52,13 @@
       const rect = canvas.getBoundingClientRect();
       const cx = Math.floor((e.clientX - rect.left) / TILE);
       const cy = Math.floor((e.clientY - rect.top) / TILE);
-      if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy] === 1) return;
+      if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy] !== 0) return;
       
-      game.map[cx][cy] = 1;
+      // 掘削：確率で空間(1)か栄養源(2)を生成
+      game.map[cx][cy] = Math.random() < 0.2 ? 2 : 1;
       game.digsLeft--;
       
       if (Math.random() < 0.7) {
-        // type: 0=草食(緑), 1=肉食(赤)
         game.monsters.push({ x: cx, y: cy, hp: 5, lv: 1, hunger: 50, type: Math.random() > 0.3 ? 0 : 1, age: 0 });
       }
 
@@ -74,21 +74,33 @@
     function update(dt) {
       if (game.phase !== 'battle') return;
 
+      const spaceCount = game.map.flat().filter(v => v >= 1).length;
+      const capacity = spaceCount * 0.3;
+
       for (let i = game.monsters.length - 1; i >= 0; i--) {
         let m = game.monsters[i];
         m.age++;
-        m.hunger -= 0.5;
+        
+        // 代謝ロジック
+        let hungerDepletion = (game.monsters.length > capacity) ? 1.0 : 0.5;
+        m.hunger -= hungerDepletion;
 
         // 1. 移動
         if (Math.random() < 0.1) {
           const nx = m.x + (Math.random() > 0.5 ? 1 : -1);
           const ny = m.y + (Math.random() > 0.5 ? 1 : -1);
-          if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny] === 1) {
+          if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny] >= 1) {
             m.x = nx; m.y = ny;
           }
         }
 
-        // 2. 捕食 (肉食が草食を食べる)
+        // 2. 栄養源の消費（草食）
+        if (m.type === 0 && game.map[m.x][m.y] === 2) {
+            m.hunger += 20;
+            game.map[m.x][m.y] = 1; // 消費して空間化
+        }
+
+        // 3. 捕食 (肉食が草食を食べる)
         if (m.type === 1) {
           for (let target of game.monsters) {
             if (target.type === 0 && target.x === m.x && target.y === m.y) {
@@ -98,17 +110,17 @@
           }
         }
 
-        // 3. 繁殖 (空腹度が高いと周囲に増える)
-        if (m.hunger > 100) {
-          m.hunger -= 60;
+        // 4. 繁殖 (エネルギー充足率80%以上)
+        if (m.hunger >= 80) {
+          m.hunger -= 40;
           game.monsters.push({ x: m.x, y: m.y, hp: 5, lv: 1, hunger: 50, type: m.type, age: 0 });
         }
 
-        // 4. 進化
-        if (m.hunger > 80 && m.lv === 1) { m.lv = 2; m.hp += 10; }
+        // 5. 進化
+        if (m.hunger > 90 && m.lv === 1) { m.lv = 2; m.hp += 10; }
 
-        // 5. 自然死
-        if (m.hunger <= 0 || m.age > 500 || m.hp <= 0) {
+        // 6. 自然死
+        if (m.hunger <= 0 || m.age > 800 || m.hp <= 0) {
           game.monsters.splice(i, 1);
         }
       }
@@ -147,7 +159,9 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       for (let x = 0; x < COLS; x++) {
         for (let y = 0; y < ROWS; y++) {
-          ctx.fillStyle = game.map[x][y] === 1 ? '#1a1a2e' : '#050505';
+          if (game.map[x][y] === 1) ctx.fillStyle = '#1a1a2e';
+          else if (game.map[x][y] === 2) ctx.fillStyle = '#3a2a1e';
+          else ctx.fillStyle = '#050505';
           ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
         }
       }
