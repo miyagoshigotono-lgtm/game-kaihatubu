@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>破壊神のダンジョンメイカー</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #1a0a2e;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    canvas {
+      display: block;
+      background: #10061e;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" tabindex="1"></canvas>
+  <script>
+// ============================================================
+// システム定数・変数（自律開発の安全領域）
+// ============================================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// 論理グリッド数。TILE はウィンドウサイズから毎回逆算してフィットさせる。
+const COLS = 20, ROWS = 15;
+const HUD = 80;          // 下部HUDの高さ(px)
+let TILE = 40;           // resize() で上書きされる（ウィンドウ追従）
+
+let game = {
+  round: 1,
+  digsLeft: 10,
+  phase: 'dig',          // 'dig' | 'battle' | 'over'
+  monsters: [],
+  heroes: [],
+  message: '魔王よ、地面をクリックして掘り進めよ'
+};
+
+// ============================================================
+// ウィンドウ全体へ自動フィット（ダイアログ制約は撤廃済み）
+//   キャンバスサイズからTILEを計算するのではなく、
+//   ウィンドウサイズからTILEを逆算してフィットさせる。
+// ============================================================
+function resize() {
+  const availW = window.innerWidth;
+  const availH = window.innerHeight - HUD;
+  TILE = Math.max(8, Math.floor(Math.min(availW / COLS, availH / ROWS)));
+  canvas.width = COLS * TILE;
+  canvas.height = ROWS * TILE + HUD;
+}
+
+function init() {
+  resize();
+  game.round = 1;
+  game.digsLeft = 10;
+  game.phase = 'dig';
+  game.monsters = [];
+  game.heroes = [];
+  game.message = '魔王よ、地面をクリックして掘り進めよ';
+
+  if (!init._bound) {
+    canvas.addEventListener('click', onDig);
+    window.addEventListener('resize', resize);
+    init._bound = true;
+  }
+}
+
+// 掘削（魂1・2・3）：魔王が自らクリックで掘り、掘った土から魔物が自動生成される
+function onDig(e) {
+  if (game.phase === 'over') { init(); return; }
+  if (game.phase !== 'dig' || game.digsLeft <= 0) return;
+  const rect = canvas.getBoundingClientRect();
+  const cx = Math.floor((e.clientX - rect.left) / TILE);
+  const cy = Math.floor((e.clientY - rect.top) / TILE);
+  if (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) return;
+  game.digsLeft--;
+  game.monsters.push({ x: cx, y: cy, hp: 3, color: '#66ff99' });
+  if (game.digsLeft <= 0) {
+    game.phase = 'battle';
+    game.message = '勇者が侵攻してきた！ 生態系で迎え撃て';
+    spawnHero();
+  }
+}
+
+// 勇者の出現（魂5）
+function spawnHero() {
+  const n = game.round;
+  for (let i = 0; i < n; i++) {
+    game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 5, t: 0 });
+  }
+}
+
+// 勇者は自律的に最寄りの魔物へ進軍する（魂5・魔王は直接介入できない＝魂6）
+function update(dt) {
+  if (game.phase !== 'battle') return;
+  for (const h of game.heroes) {
+    h.t += dt;
+    if (h.t < 0.4) continue;
+    h.t = 0;
+    const target = game.monsters[0];
+    if (!target) break;
+    if (target.x > h.x) h.x++;
+    else if (target.x < h.x) h.x--;
+    else if (target.y > h.y) h.y++;
+    else if (target.y < h.y) h.y--;
+    if (h.x === target.x && h.y === target.y) {
+      target.hp--; h.hp--;
+      if (target.hp <= 0) game.monsters.shift();
+      if (h.hp <= 0) h.dead = true;
+    }
+  }
+  game.heroes = game.heroes.filter(h => !h.dead);
+  if (game.monsters.length === 0) {            // 魔物全滅＝敗北（魂7）
+    game.message = '魔物全滅… 敗北。クリックでリスタート';
+    game.phase = 'over';
+  } else if (game.heroes.length === 0) {       // 勇者全滅＝次ラウンド（魂7）
+    game.round++;
+    game.digsLeft = 10 + game.round;
+    game.phase = 'dig';
+    game.message = 'ラウンド ' + game.round + '：再び掘れ';
+  }
+}
+
+function render() {
+  ctx.fillStyle = '#10061e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // マップグリッド
+  ctx.strokeStyle = '#2a1a44';
+  for (let x = 0; x <= COLS; x++) { ctx.beginPath(); ctx.moveTo(x * TILE, 0); ctx.lineTo(x * TILE, ROWS * TILE); ctx.stroke(); }
+  for (let y = 0; y <= ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * TILE); ctx.lineTo(COLS * TILE, y * TILE); ctx.stroke(); }
+
+  // 魔物
+  for (const m of game.monsters) { ctx.fillStyle = m.color; ctx.fillRect(m.x * TILE + 6, m.y * TILE + 6, TILE - 12, TILE - 12); }
+
+  // 勇者
+  for (const h of game.heroes) {
+    ctx.fillStyle = '#ffcc44';
+    ctx.beginPath();
+    ctx.arc(h.x * TILE + TILE / 2, h.y * TILE + TILE / 2, TILE / 2 - 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // HUD
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '16px monospace';
+  ctx.fillText('Round ' + game.round + '   掘削残り: ' + game.digsLeft + '   魔物: ' + game.monsters.length + '   勇者: ' + game.heroes.length, 10, ROWS * TILE + 26);
+  ctx.fillStyle = '#aa88ff';
+  ctx.fillText(game.message, 10, ROWS * TILE + 52);
+}
+
+let _lastTs = 0;
+function gameLoop(ts) {
+  const dt = _lastTs ? (ts - _lastTs) / 1000 : 0;
+  _lastTs = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener('load', function () {
+  init();
+  canvas.focus();
+  requestAnimationFrame(gameLoop);
+});
+  </script>
+</body>
+</html>
