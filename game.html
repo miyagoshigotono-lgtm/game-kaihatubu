@@ -63,11 +63,12 @@
       const cy = Math.floor((e.clientY - rect.top) / TILE);
       if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy] !== 0) return;
       
-      game.map[cx][cy] = Math.random() < 0.25 ? 2 : 1;
+      const rand = Math.random();
+      game.map[cx][cy] = rand < 0.25 ? 2 : 1;
       game.digsLeft--;
       
       if (Math.random() < 0.6) {
-        game.monsters.push({ x: cx, y: cy, hp: 5, lv: 1, hunger: 60, type: Math.random() > 0.3 ? 0 : 1, age: 0 });
+        game.monsters.push({ x: cx, y: cy, hp: 5, lv: 1, hunger: 60, type: Math.random() > 0.3 ? 0 : 1, age: 0, isDiseased: false });
       }
 
       if (game.digsLeft <= 0) {
@@ -85,17 +86,20 @@
 
       if (game.phase !== 'battle') return;
 
-      const spaceCount = game.map.flat().filter(v => v >= 1).length || 1;
-      const stressFactor = Math.max(1, (game.monsters.length / (spaceCount * 0.4)) * 1.5);
-
       for (let i = game.monsters.length - 1; i >= 0; i--) {
         let m = game.monsters[i];
         m.age++;
-        m.hunger -= (0.5 + (0.5 * stressFactor)) * dt * 10;
+        
+        let hungerDrain = 5;
+        if (game.map[m.x][m.y] === 2) {
+            m.hunger += 15;
+        } else if (game.map[m.x][m.y] === 3) {
+            m.hunger += 40;
+            if (Math.random() < 0.05) m.isDiseased = true;
+        }
+        m.hunger -= (hungerDrain + (m.isDiseased ? 5 : 0)) * dt;
 
-        if (m.hunger < 15) addParticle(m.x, m.y, 'fog');
-
-        if (Math.random() < 0.2) {
+        if (Math.random() < 0.1) {
           const nx = m.x + Math.floor(Math.random() * 3) - 1;
           const ny = m.y + Math.floor(Math.random() * 3) - 1;
           if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny] >= 1) {
@@ -103,33 +107,28 @@
           }
         }
 
-        if (m.type === 0 && game.map[m.x][m.y] === 2) {
-            m.hunger += 30; game.map[m.x][m.y] = 1;
-        }
-
         if (m.type === 1) {
           game.monsters.forEach(target => {
             if (target.type === 0 && target.x === m.x && target.y === m.y) {
-              m.hunger += 50; target.hp = 0;
+              m.hunger += 60; target.hp = 0;
               addParticle(m.x, m.y, 'blood');
-              game.decals.push({ x: m.x, y: m.y, life: 2 });
+              game.decals.push({ x: m.x, y: m.y, life: 5 });
+              game.map[m.x][m.y] = 3;
             }
           });
         }
 
-        if (m.hunger >= (80 * stressFactor)) {
-          m.hunger -= 40;
-          game.monsters.push({ x: m.x, y: m.y, hp: 5, lv: 1, hunger: 50, type: m.type, age: 0 });
+        if (m.hunger >= 100) {
+          m.hunger -= 50;
+          game.monsters.push({ x: m.x, y: m.y, hp: 5, lv: 1, hunger: 50, type: m.type, age: 0, isDiseased: false });
         }
 
-        if (m.hunger > 120 && m.lv === 1) { m.lv = 2; m.hp += 10; addParticle(m.x, m.y, 'gold'); }
-
-        if (m.hunger <= 0 || m.age > 1200 || m.hp <= 0) game.monsters.splice(i, 1);
+        if (m.hunger <= 0 || m.hp <= 0 || (m.isDiseased && m.age > 500)) game.monsters.splice(i, 1);
       }
 
       game.heroes.forEach((h, idx) => {
         h.t += dt;
-        if (h.t > 0.6) {
+        if (h.t > 0.8) {
           h.t = 0;
           let target = game.monsters.length > 0 ? game.monsters.reduce((prev, curr) => 
             (Math.abs(curr.x - h.x) + Math.abs(curr.y - h.y)) < (Math.abs(prev.x - h.x) + Math.abs(prev.y - h.y)) ? curr : prev
@@ -149,35 +148,31 @@
 
     function render() {
       ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      let nutrients = 0;
       for (let x = 0; x < COLS; x++) {
         for (let y = 0; y < ROWS; y++) {
-          ctx.fillStyle = game.map[x][y] === 1 ? '#1a1a2e' : (game.map[x][y] === 2 ? '#3a2a1e' : '#050505');
+          let color = '#1a1a2e';
+          if (game.map[x][y] === 2) { color = '#4a3a2e'; nutrients++; }
+          else if (game.map[x][y] === 3) { color = '#3a1a1a'; nutrients += 2; }
+          ctx.fillStyle = color;
           ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
         }
       }
-      game.decals.forEach(d => { ctx.fillStyle = 'rgba(255,0,0,0.3)'; ctx.fillRect(d.x * TILE, d.y * TILE, TILE, TILE); });
       game.monsters.forEach(m => {
-        ctx.fillStyle = m.type === 0 ? '#44ff44' : '#ff4444';
-        ctx.globalAlpha = m.lv === 2 ? 1.0 : 0.6;
+        ctx.fillStyle = m.isDiseased ? '#888' : (m.type === 0 ? '#44ff44' : '#ff4444');
         ctx.fillRect(m.x * TILE + 5, m.y * TILE + 5, TILE - 10, TILE - 10);
-        if (Math.abs(mouse.x - (m.x * TILE + TILE/2)) < TILE/2 && Math.abs(mouse.y - (m.y * TILE + TILE/2)) < TILE/2) {
-          ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(m.x*TILE+TILE/2, m.y*TILE+TILE/2, TILE*0.7, 0, (m.hunger/100)*Math.PI*2); ctx.stroke();
-        }
       });
-      game.particles.forEach(p => {
-        ctx.fillStyle = p.type === 'fog' ? '#333' : (p.type === 'gold' ? '#ffd700' : '#f00');
-        ctx.globalAlpha = p.life;
-        ctx.beginPath(); ctx.arc(p.x, p.y, TILE/4, 0, Math.PI*2); ctx.fill();
-      });
-      ctx.globalAlpha = 1.0;
       game.heroes.forEach(h => { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(h.x * TILE + TILE/2, h.y * TILE + TILE/2, TILE/3, 0, Math.PI*2); ctx.fill(); });
-      ctx.fillStyle = '#fff'; ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 40);
-      ctx.fillText(game.message, 20, ROWS * TILE + 75);
+      
+      ctx.fillStyle = '#333'; ctx.fillRect(20, ROWS * TILE + 20, 200, 10);
+      ctx.fillStyle = '#0f0'; ctx.fillRect(20, ROWS * TILE + 20, Math.min(200, nutrients * 5), 10);
+      ctx.fillStyle = '#fff'; ctx.fillText(`栄養密度`, 20, ROWS * TILE + 45);
+      ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 70);
+      ctx.fillText(game.message, 20, ROWS * TILE + 100);
     }
 
     let last = 0;
     function loop(ts) { update((ts - last) / 1000); render(); last = ts; requestAnimationFrame(loop); }
-    window.addEventListener('mousemove', e => { const r = canvas.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; });
     window.addEventListener('resize', resize);
     canvas.addEventListener('click', onDig);
     init(); requestAnimationFrame(loop);
