@@ -58,7 +58,8 @@
       game.digsLeft--;
       
       if (Math.random() < 0.7) {
-        game.monsters.push({ x: cx, y: cy, hp: 5, lv: 1, energy: 0 });
+        // type: 0=草食(緑), 1=肉食(赤)
+        game.monsters.push({ x: cx, y: cy, hp: 5, lv: 1, hunger: 50, type: Math.random() > 0.3 ? 0 : 1, age: 0 });
       }
 
       if (game.digsLeft <= 0) {
@@ -73,25 +74,48 @@
     function update(dt) {
       if (game.phase !== 'battle') return;
 
-      // 魔物の生態系シミュレーション（進化・捕食）
       for (let i = game.monsters.length - 1; i >= 0; i--) {
         let m = game.monsters[i];
-        if (Math.random() < 0.02) {
+        m.age++;
+        m.hunger -= 0.5;
+
+        // 1. 移動
+        if (Math.random() < 0.1) {
           const nx = m.x + (Math.random() > 0.5 ? 1 : -1);
           const ny = m.y + (Math.random() > 0.5 ? 1 : -1);
           if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny] === 1) {
             m.x = nx; m.y = ny;
           }
         }
-        // 進化ロジック：エネルギーを貯めて進化
-        m.energy += 0.1;
-        if (m.energy > 50 && m.lv === 1) { m.lv = 2; m.hp += 10; m.energy = 0; }
+
+        // 2. 捕食 (肉食が草食を食べる)
+        if (m.type === 1) {
+          for (let target of game.monsters) {
+            if (target.type === 0 && target.x === m.x && target.y === m.y) {
+              m.hunger += 40;
+              target.hp = 0;
+            }
+          }
+        }
+
+        // 3. 繁殖 (空腹度が高いと周囲に増える)
+        if (m.hunger > 100) {
+          m.hunger -= 60;
+          game.monsters.push({ x: m.x, y: m.y, hp: 5, lv: 1, hunger: 50, type: m.type, age: 0 });
+        }
+
+        // 4. 進化
+        if (m.hunger > 80 && m.lv === 1) { m.lv = 2; m.hp += 10; }
+
+        // 5. 自然死
+        if (m.hunger <= 0 || m.age > 500 || m.hp <= 0) {
+          game.monsters.splice(i, 1);
+        }
       }
 
-      // 勇者のAI（魔物探索と攻撃）
       for (let h of game.heroes) {
         h.t += dt;
-        if (h.t > 0.5) {
+        if (h.t > 0.8) {
           h.t = 0;
           let target = game.monsters.reduce((prev, curr) => {
             const d1 = Math.abs(prev.x - h.x) + Math.abs(prev.y - h.y);
@@ -102,11 +126,7 @@
           if (target) {
             if (target.x !== h.x) h.x += (target.x > h.x ? 1 : -1);
             else if (target.y !== h.y) h.y += (target.y > h.y ? 1 : -1);
-
-            if (h.x === target.x && h.y === target.y) {
-              target.hp -= (2 + Math.floor(game.round/2));
-              if (target.hp <= 0) game.monsters.splice(game.monsters.indexOf(target), 1);
-            }
+            if (h.x === target.x && h.y === target.y) target.hp -= 3;
           }
         }
       }
@@ -132,11 +152,13 @@
         }
       }
       for (let m of game.monsters) {
-        ctx.fillStyle = m.lv === 1 ? '#44ff44' : '#ffaa00';
+        ctx.fillStyle = m.type === 0 ? '#44ff44' : '#ff4444';
+        ctx.globalAlpha = m.lv === 2 ? 1.0 : 0.6;
         ctx.fillRect(m.x * TILE + 5, m.y * TILE + 5, TILE - 10, TILE - 10);
+        ctx.globalAlpha = 1.0;
       }
       for (let h of game.heroes) {
-        ctx.fillStyle = '#ff4444';
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(h.x * TILE + TILE/2, h.y * TILE + TILE/2, TILE/3, 0, Math.PI*2);
         ctx.fill();
