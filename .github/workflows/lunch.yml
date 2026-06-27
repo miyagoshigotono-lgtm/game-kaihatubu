@@ -2,8 +2,7 @@ name: Lunch Meeting (ランチ)
 
 on:
   schedule:
-    # UTC 4:00 = JST 13:00
-    - cron: '0 4 * * *'
+    - cron: '30 * * * *'
   workflow_dispatch:
 
 permissions:
