@@ -1,0 +1,43 @@
+name: Morning Meeting (朝礼)
+
+on:
+  schedule:
+    # UTC 1:15 = JST 10:15
+    - cron: '15 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dungeon-maker-pipeline
+  cancel-in-progress: false
+
+jobs:
+  morning:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run morning agent (分析・評価・方針決定)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node scripts/morning.js
+
+      - name: Commit morning_directive.json (game.html は不変)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add morning_directive.json logs.json
+          if git diff --staged --quiet; then
+            echo "変更なし。コミットをスキップします。"
+          else
+            git commit -m "朝礼: morning_directive.json を更新 [skip ci]"
+            git push
+          fi
