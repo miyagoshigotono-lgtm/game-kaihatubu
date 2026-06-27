@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>破壊神のダンジョンメイカー</title>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; font-family: 'Courier New', Courier, monospace; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; font-family: 'Courier New', Courier, monospace; color: #fff; }
     canvas { display: block; }
   </style>
 </head>
@@ -15,14 +15,14 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const COLS = 20, ROWS = 15;
-    const HUD = 100;
+    const HUD = 120;
     let TILE = 40;
 
     let game = {
       round: 1,
       digsLeft: 10,
       phase: 'dig',
-      map: [], // 0:壁, 1:通路
+      map: [],
       monsters: [],
       heroes: [],
       message: '魔王よ、地面を掘り、魔物の揺りかごを作れ'
@@ -43,7 +43,7 @@
       game.heroes = [];
       game.phase = 'dig';
       game.digsLeft = 10 + (game.round - 1) * 2;
-      game.message = 'ラウンド ' + game.round + '：掘り進めよ';
+      game.message = 'ラウンド ' + game.round + '：ダンジョンを掘り進めよ';
     }
 
     function onDig(e) {
@@ -57,16 +57,15 @@
       game.map[cx][cy] = 1;
       game.digsLeft--;
       
-      // 魂3：土を掘ると���環境」が整い、魔物が自然発生する
-      if (Math.random() < 0.6) {
-        game.monsters.push({ x: cx, y: cy, hp: 5, energy: 100, type: 'predator' });
+      if (Math.random() < 0.7) {
+        game.monsters.push({ x: cx, y: cy, hp: 5, lv: 1, energy: 0 });
       }
 
       if (game.digsLeft <= 0) {
         game.phase = 'battle';
         game.message = '勇者が侵攻を開始した！';
-        for (let i = 0; i < game.round; i++) {
-          game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 10, t: 0 });
+        for (let i = 0; i < 2 + game.round; i++) {
+          game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 10 + game.round * 5, t: 0 });
         }
       }
     }
@@ -74,32 +73,39 @@
     function update(dt) {
       if (game.phase !== 'battle') return;
 
-      // 魔物の自律行動（徘徊と捕食）
-      for (let m of game.monsters) {
-        if (Math.random() < 0.05) {
+      // 魔物の生態系シミュレーション（進化・捕食）
+      for (let i = game.monsters.length - 1; i >= 0; i--) {
+        let m = game.monsters[i];
+        if (Math.random() < 0.02) {
           const nx = m.x + (Math.random() > 0.5 ? 1 : -1);
           const ny = m.y + (Math.random() > 0.5 ? 1 : -1);
           if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny] === 1) {
             m.x = nx; m.y = ny;
           }
         }
+        // 進化ロジック：エネルギーを貯めて進化
+        m.energy += 0.1;
+        if (m.energy > 50 && m.lv === 1) { m.lv = 2; m.hp += 10; m.energy = 0; }
       }
 
-      // 勇者のAI（通路のみ移動）
+      // 勇者のAI（魔物探索と攻撃）
       for (let h of game.heroes) {
         h.t += dt;
-        if (h.t > 0.8) {
+        if (h.t > 0.5) {
           h.t = 0;
-          let target = game.monsters[Math.floor(Math.random() * game.monsters.length)];
+          let target = game.monsters.reduce((prev, curr) => {
+            const d1 = Math.abs(prev.x - h.x) + Math.abs(prev.y - h.y);
+            const d2 = Math.abs(curr.x - h.x) + Math.abs(curr.y - h.y);
+            return d2 < d1 ? curr : prev;
+          }, game.monsters[0]);
+
           if (target) {
-            if (target.x > h.x && game.map[h.x + 1][h.y]) h.x++;
-            else if (target.x < h.x && game.map[h.x - 1][h.y]) h.x--;
-            else if (target.y > h.y && game.map[h.x][h.y + 1]) h.y++;
-            else if (target.y < h.y && game.map[h.x][h.y - 1]) h.y--;
-            
+            if (target.x !== h.x) h.x += (target.x > h.x ? 1 : -1);
+            else if (target.y !== h.y) h.y += (target.y > h.y ? 1 : -1);
+
             if (h.x === target.x && h.y === target.y) {
-              target.hp -= 2;
-              if (target.hp <= 0) game.monsters = game.monsters.filter(m => m !== target);
+              target.hp -= (2 + Math.floor(game.round/2));
+              if (target.hp <= 0) game.monsters.splice(game.monsters.indexOf(target), 1);
             }
           }
         }
@@ -112,7 +118,7 @@
         game.round++;
         game.phase = 'dig';
         game.digsLeft = 10 + (game.round - 1) * 2;
-        game.message = '勇者を撃退した。ラウンド ' + game.round + ' へ';
+        game.message = '防衛成功。ラウンド ' + game.round + ' へ';
       }
     }
 
@@ -126,7 +132,7 @@
         }
       }
       for (let m of game.monsters) {
-        ctx.fillStyle = '#44ff44';
+        ctx.fillStyle = m.lv === 1 ? '#44ff44' : '#ffaa00';
         ctx.fillRect(m.x * TILE + 5, m.y * TILE + 5, TILE - 10, TILE - 10);
       }
       for (let h of game.heroes) {
@@ -136,8 +142,8 @@
         ctx.fill();
       }
       ctx.fillStyle = '#fff';
-      ctx.font = '20px monospace';
-      ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length}`, 20, ROWS * TILE + 40);
+      ctx.font = '18px monospace';
+      ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 40);
       ctx.fillText(game.message, 20, ROWS * TILE + 75);
     }
 
