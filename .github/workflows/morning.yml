@@ -2,8 +2,7 @@ name: Morning Meeting (朝礼)
 
 on:
   schedule:
-    # UTC 1:15 = JST 10:15
-    - cron: '15 1 * * *'
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 permissions:
