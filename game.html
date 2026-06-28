@@ -29,16 +29,17 @@
       message: '魔王よ、地面を掘り、魔物の揺りかごを作れ'
     };
 
-    function mutate(val) {
-      return Math.max(0.1, val * (0.95 + Math.random() * 0.1));
+    function mutate(val, nutrient) {
+      const factor = Math.max(0.2, Math.min(1.0, nutrient / 5.0));
+      return Math.max(0.1, val * (0.95 + Math.random() * 0.1 * factor));
     }
 
-    function createMonster(x, y, type, parentGenes = null) {
+    function createMonster(x, y, type, parentGenes = null, nutrient = 1.0) {
       const genes = parentGenes ? {
-        speed: mutate(parentGenes.speed),
-        metabolism: mutate(parentGenes.metabolism),
-        reproThreshold: mutate(parentGenes.reproThreshold),
-        vision: mutate(parentGenes.vision)
+        speed: mutate(parentGenes.speed, nutrient),
+        metabolism: mutate(parentGenes.metabolism, nutrient),
+        reproThreshold: mutate(parentGenes.reproThreshold, nutrient),
+        vision: mutate(parentGenes.vision, nutrient)
       } : {
         speed: 0.5 + Math.random() * 0.5,
         metabolism: 0.8 + Math.random() * 0.4,
@@ -84,7 +85,7 @@
       const cy = Math.floor((e.clientY - rect.top) / TILE);
       if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy] > 0) return;
       
-      game.map[cx][cy] = 1.0; 
+      game.map[cx][cy] = 2.0; 
       game.digsLeft--;
       
       if (Math.random() < 0.7) {
@@ -105,28 +106,29 @@
       if (game.phase === 'battle') {
         for(let x=0; x<COLS; x++) {
           for(let y=0; y<ROWS; y++) {
-            if (game.map[x][y] > 0) game.map[x][y] = Math.max(0, game.map[x][y] - 0.002 * dt);
+            if (game.map[x][y] > 0) game.map[x][y] = Math.max(0, game.map[x][y] - 0.0005 * dt);
           }
         }
 
         for (let i = game.monsters.length - 1; i >= 0; i--) {
           let m = game.monsters[i];
+          let density = game.grid[m.x][m.y].length;
+          let nutrient = game.map[m.x][m.y];
+          let metabolism = m.genes.metabolism * (1 + (Math.pow(density, 2) / (nutrient + 0.1)));
+          
           m.lastMoveTime += dt;
-          m.hunger -= (m.genes.metabolism * 0.1) * dt;
+          m.hunger -= metabolism * dt;
           
           if (m.type === 1) {
-            let cell = game.grid[m.x][m.y];
-            let prey = cell.find(other => other.type === 0);
-            if (prey) {
-              m.hunger += 50; prey.hp = -100;
-            }
+            let prey = game.grid[m.x][m.y].find(other => other.type === 0);
+            if (prey) { m.hunger += 40; prey.hp = -100; }
           }
 
           if (m.lastMoveTime > m.genes.speed) {
-            let bestX = m.x, bestY = m.y, maxD = game.map[m.x][m.y];
+            let bestX = m.x, bestY = m.y, maxN = game.map[m.x][m.y];
             for(let nx = Math.max(0, m.x-1); nx <= Math.min(COLS-1, m.x+1); nx++){
               for(let ny = Math.max(0, m.y-1); ny <= Math.min(ROWS-1, m.y+1); ny++){
-                if(game.map[nx][ny] > maxD) { maxD = game.map[nx][ny]; bestX = nx; bestY = ny; }
+                if(game.map[nx][ny] > maxN) { maxN = game.map[nx][ny]; bestX = nx; bestY = ny; }
               }
             }
             m.x = bestX; m.y = bestY; m.lastMoveTime = 0;
@@ -134,10 +136,11 @@
 
           if (m.hunger >= m.genes.reproThreshold && game.map[m.x][m.y] > 0.5) {
             m.hunger -= 60;
-            game.monsters.push(createMonster(m.x, m.y, m.type, m.genes));
+            game.monsters.push(createMonster(m.x, m.y, m.type, m.genes, nutrient));
           }
 
           if (m.hunger <= 0 || m.hp <= 0) {
+            game.map[m.x][m.y] += 0.5;
             game.monsters.splice(i, 1);
           }
         }
@@ -163,16 +166,15 @@
       ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
       for (let x = 0; x < COLS; x++) {
         for (let y = 0; y < ROWS; y++) {
-          let d = game.map[x][y];
-          ctx.fillStyle = `rgb(${d*100}, 20, 20)`;
+          let d = Math.min(1, game.map[x][y] / 2);
+          ctx.fillStyle = `rgb(${d*150}, ${d*50}, 20)`;
           ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
         }
       }
       game.monsters.forEach(m => {
-        const hue = m.type === 1 ? 0 : 220;
-        const size = (0.3 / m.genes.speed) * (TILE/2);
-        ctx.fillStyle = `hsl(${hue}, 80%, ${20 + m.genes.metabolism * 30}%)`;
-        ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, Math.max(2, size), 0, Math.PI*2); ctx.fill();
+        const hue = m.type === 1 ? 0 : 200;
+        ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
+        ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/4, 0, Math.PI*2); ctx.fill();
       });
       game.heroes.forEach(h => { ctx.fillStyle = '#fff'; ctx.fillRect(h.x * TILE + 5, h.y * TILE + 5, TILE - 10, TILE - 10); });
       
@@ -180,7 +182,7 @@
       ctx.font = '14px monospace';
       ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 30);
       ctx.fillText(game.message, 20, ROWS * TILE + 60);
-      ctx.fillText("青: 被食者 / 赤: 捕食者 | 色相:代謝速度 / サイズ:移動速度", 20, ROWS * TILE + 90);
+      ctx.fillText("青: 被食者 / 赤: 捕食者 | 地形が赤いほど栄養豊富", 20, ROWS * TILE + 90);
     }
 
     let last = 0;
