@@ -16,6 +16,8 @@
     const ctx = canvas.getContext('2d');
     const COLS = 20, ROWS = 15;
     const HUD = 120;
+    const K = 0.5; // 適正収容係数
+    const BASE_RATE = 5.0;
     let TILE = 40;
 
     let game = {
@@ -72,9 +74,13 @@
 
     function update(dt) {
       if (game.phase === 'battle') {
+        let totalMetabolicRate = 0;
+        let totalNutrition = 0;
+
         for(let x=0; x<COLS; x++) {
           for(let y=0; y<ROWS; y++) {
             if (game.map[x][y] > 0) game.map[x][y] = Math.max(0, game.map[x][y] - 0.01 * dt);
+            totalNutrition += game.map[x][y];
           }
         }
 
@@ -86,7 +92,10 @@
           let d = game.map[m.x][m.y];
           let density = densityMap[m.x][m.y];
           
-          let metabolicRate = 15 * (1 + (density / (d + 0.1)));
+          let metabolicRate = BASE_RATE * (1.0 / (d + 0.1)) * (1.0 + Math.pow(density / (d * K + 0.1), 2));
+          if (d > 0.5) metabolicRate *= 0.7;
+          
+          totalMetabolicRate += metabolicRate;
           m.hunger -= metabolicRate * dt;
           
           if (m.type === 1) {
@@ -111,6 +120,10 @@
             game.map[m.x][m.y] = Math.min(1.0, game.map[m.x][m.y] + 0.2);
             game.monsters.splice(i, 1);
           }
+        }
+
+        if (game.monsters.length > 0) {
+            console.log(`${game.monsters.length},${(totalMetabolicRate/game.monsters.length).toFixed(2)},${(totalNutrition/(COLS*ROWS)).toFixed(4)}`);
         }
 
         game.heroes.forEach((h, idx) => {
