@@ -16,7 +16,6 @@
     const ctx = canvas.getContext('2d');
     const COLS = 20, ROWS = 15;
     const HUD = 120;
-    const K = 0.5;
     const BASE_RATE = 5.0;
     const MOVE_COST = 2.0;
     const MOVE_INTERVAL = 0.8;
@@ -28,9 +27,19 @@
       phase: 'dig',
       map: [], 
       monsters: [],
+      grid: [],
       heroes: [],
       message: '魔王よ、地面を掘り、魔物の揺りかごを作れ'
     };
+
+    function updateGrid() {
+      game.grid = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => []));
+      game.monsters.forEach(m => {
+        if (m.x >= 0 && m.x < COLS && m.y >= 0 && m.y < ROWS) {
+          game.grid[m.x][m.y].push(m);
+        }
+      });
+    }
 
     function resize() {
       const availW = window.innerWidth;
@@ -48,6 +57,7 @@
       game.phase = 'dig';
       game.digsLeft = 10 + (game.round - 1) * 2;
       game.message = 'ラウンド ' + game.round + '：ダンジョンを掘り進めよ';
+      updateGrid();
     }
 
     function onDig(e) {
@@ -63,6 +73,7 @@
       
       if (Math.random() < 0.6) {
         game.monsters.push({ x: cx, y: cy, hp: 10, type: Math.random() > 0.4 ? 0 : 1, hunger: 100, lastMoveTime: 0 });
+        updateGrid();
       }
 
       if (game.digsLeft <= 0) {
@@ -90,11 +101,14 @@
           m.hunger -= (BASE_RATE * 0.1) * dt;
           
           if (m.type === 1) {
-            game.monsters.forEach(target => {
-              if (target.type === 0 && target.x === m.x && target.y === m.y) {
+            let cell = game.grid[m.x][m.y];
+            for (let j = 0; j < cell.length; j++) {
+              let target = cell[j];
+              if (target.type === 0) {
                 m.hunger += 40; target.hp = -1;
+                break;
               }
-            });
+            }
           }
 
           if (m.lastMoveTime > MOVE_INTERVAL) {
@@ -119,12 +133,13 @@
             game.monsters.splice(i, 1);
           }
         }
+        updateGrid();
 
         game.heroes.forEach((h, idx) => {
           h.t += dt;
           if (h.t > 1.2) {
             h.t = 0;
-            let target = game.monsters.find(m => m.x === h.x && m.y === h.y);
+            let target = game.grid[h.x][h.y].find(m => m.type === 1 || m.type === 0);
             if (target) target.hp -= 5;
             else if (h.x < COLS - 1) h.x++;
           }
