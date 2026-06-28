@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "sections": {
+    "CONFIG": "定数・Canvas初期化・グリッドサイズ(COLS/ROWS)・TILE計算・HUD高さ・mouseX/Y変数。変更は慎重に。",
+    "STATE": "gameオブジェクト定義。monsters/heroes/phase/round/digsLeft/map/grid/message。新状態変数はここに追加する。",
+    "ECOSYSTEM": "mutate()・createMonster()・遺伝子継承・updateGrid()・resize()。魔物生成と生態系の核。",
+    "INIT_INPUT": "init()（ラウンド初期化）とonDig()（クリック掘削ハンドラ）。掘削制限・魔物自動生成・勇者出現。",
+    "UPDATE": "update(dt)。毎フレームの魔物移動・捕食・繁殖・勇者AI侵攻・攻撃・勝敗判定。",
+    "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
+  },
+  "recent_sections": [],
+  "implemented_features": [
+    "[ECOSYSTEM] mutate()による遺伝子継承とcreateMonster()による魔物生成",
+    "[ECOSYSTEM] 捕食者(type1)と被食者(type0)の2タイプ・エネルギー捕食",
+    "[ECOSYSTEM] 捕食者数/被食者数比率連動型代謝コスト（preyRatio * K）",
+    "[ECOSYSTEM] 遺伝子パラメータ（speed/metabolism/reproThreshold/size）による個体差",
+    "[UPDATE] 捕食・繁殖・移動のメインループ",
+    "[UPDATE] 勇者の栄養密度+魔物密度スコアによる自律侵攻AI",
+    "[INIT_INPUT] クリック掘削・ラウンド制限・魔物自動生成・勇者出現トリガー",
+    "[RENDER] 地形の栄養値による色グラデーション描画",
+    "[RENDER] 魔物をタイプ別色円・勇者を白四角で描画"
+  ],
+  "failed_approaches": [],
+  "current_cycle": 20,
+  "notes": "v2: セクション分割による外科的改善方式に移行。1サイクルで1セクションのみを改善する。"
+}
