@@ -1,9 +1,9 @@
 'use strict';
 /*
- * morning.js — 朝礼（分析・セクション選定・方針決定フェーズ）v2
- *   [変更点] セクション単位の外科的改善方式。
- *   feature_registry.json を読み、直近3件で触ったセクションを避けて選定する。
- *   game.html は一切変更しない。morning_directive.json + feature_registry.json のみ更新。
+ * morning.js — 朝礼（コード改善フェーズ）v3 [C案: 対称型]
+ *   lunch.js と同じ「セクション選定→生成→QA→game.html更新」を独立して実行する。
+ *   morning_directive.json は廃止。feature_registry.json で lunch.js と連携する。
+ *   user_intent.json を読み込み、オーナーの意図をプロンプトに反映する。
  *   外部npm不使用。Node標準の https と fs のみ。
  */
 const fs = require('fs');
@@ -11,6 +11,8 @@ const https = require('https');
 
 const MODEL = 'gemini-3.1-flash-lite';
 const API_KEY = process.env.GEMINI_API_KEY || '';
+const MAX_RETRY = 2;
+const CYCLE_TYPE = 'morning';
 
 const GAME_SOUL = `
 【ゲームタイトル】破壊神のダンジョンメイカー
@@ -36,7 +38,6 @@ const IMPL_FREEDOM = `
 - 操作方法（ドラッグ・ホイール・Shift連動など）
 `;
 
-// セクション定義（lunch.js と同じ内容を保つこと）
 const SECTION_DEFS = {
   CONFIG:     '定数・Canvas初期化・グリッドサイズ(COLS/ROWS)・TILE計算・HUD高さ・mouseX/Y変数。',
   STATE:      'gameオブジェクト定義。monsters/heroes/phase/round/digsLeft/map/grid/message。新状態変数はここ。',
@@ -76,7 +77,7 @@ function postGemini(prompt, generationConfig) {
 }
 
 async function callGemini(prompt, generationConfig) {
-  if (!API_KEY) throw new Error('GEMINI_API_KEY が未設定です。GitHub Secrets を確認してください。');
+  if (!API_KEY) throw new Error('GEMINI_API_KEY が未設定です。');
   const waits = [5, 10, 20, 40, 80];
   for (let attempt = 0; attempt <= 5; attempt++) {
     const res = await postGemini(prompt, generationConfig);
@@ -103,19 +104,21 @@ async function callGemini(prompt, generationConfig) {
 function truncate(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n) + '…' : s; }
 function readFileSafe(p, fb) { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return fb; } }
 function readJsonSafe(p, fb) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fb; } }
-function today() { return new Date().toISOString().slice(0, 10); }
-
+function nowStamp() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 function extractJson(text) {
-  let s = String(text == null ? '' : text).trim();
-  s = s.replace(/```json/gi, '').replace(/```/g, '').trim();
+  let s = String(text == null ? '' : text).trim().replace(/```json/gi, '').replace(/```/g, '').trim();
   const fb = s.indexOf('{'), lb = s.lastIndexOf('}');
-  if (fb !== -1 && lb !== -1 && lb > fb) {
-    try { return JSON.parse(s.slice(fb, lb + 1)); } catch (e) { /* fallthrough */ }
-  }
+  if (fb !== -1 && lb > fb) { try { return JSON.parse(s.slice(fb, lb + 1)); } catch (e) {} }
   return null;
 }
 
-// game.html からセクション内容を抽出
+// ============================================================
+// セクション操作
+// ============================================================
 function extractSection(html, name) {
   const startTag = `// ===SECTION:${name}===`;
   const endTag = `// ===END:${name}===`;
@@ -125,42 +128,111 @@ function extractSection(html, name) {
   return html.slice(s + startTag.length, e).trim();
 }
 
-// ============================================================
-// メイン
-// ============================================================
-async function main() {
-  const gameHtml = readFileSafe('game.html', '');
-  const logs = readJsonSafe('logs.json', []);
-  const prevDirective = readJsonSafe('morning_directive.json', {});
-  const registry = readJsonSafe('feature_registry.json', {
-    recent_sections: [], implemented_features: [], failed_approaches: [], current_cycle: 0
-  });
+function replaceSection(html, name, newContent) {
+  const startTag = `// ===SECTION:${name}===`;
+  const endTag = `// ===END:${name}===`;
+  const s = html.indexOf(startTag);
+  const e = html.indexOf(endTag);
+  if (s === -1 || e === -1 || e < s) return null;
+  return html.slice(0, s + startTag.length) + '\n' + newContent + '\n' + html.slice(e);
+}
 
+function hasSectionMarkers(html) {
+  return ALL_SECTIONS.every(name =>
+    html.includes(`// ===SECTION:${name}===`) && html.includes(`// ===END:${name}===`)
+  );
+}
+
+// ============================================================
+// 静的検証
+// ============================================================
+function scanBalance(code) {
+  const depth = { '{': 0, '(': 0, '[': 0 };
+  const close = { '}': '{', ')': '(', ']': '[' };
+  let inStr = null, lineC = false, blockC = false;
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i], n = code[i + 1];
+    if (lineC) { if (c === '\n') lineC = false; continue; }
+    if (blockC) { if (c === '*' && n === '/') { blockC = false; i++; } continue; }
+    if (inStr) { if (c === '\\') { i++; continue; } if (c === inStr) inStr = null; continue; }
+    if (c === '/' && n === '/') { lineC = true; i++; continue; }
+    if (c === '/' && n === '*') { blockC = true; i++; continue; }
+    if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+    if (depth[c] !== undefined) depth[c]++;
+    else if (close[c]) {
+      depth[close[c]]--;
+      if (depth[close[c]] < 0) return { ok: false, reason: `'${c}' が余分` };
+    }
+  }
+  if (depth['{'] || depth['('] || depth['[']) return { ok: false, reason: `括弧不一致 {:${depth['{']} (:${depth['(']} [:${depth['[']}` };
+  if (inStr) return { ok: false, reason: '文字列が閉じていない' };
+  if (blockC) return { ok: false, reason: 'ブロックコメントが閉じていない' };
+  return { ok: true };
+}
+
+function verifySectionCode(code) {
+  const blocking = [];
+  if (!code || code.length < 30) blocking.push('コードが短すぎる');
+  if (code.includes('// ===SECTION:') || code.includes('// ===END:')) blocking.push('マーカーが混入している');
+  if (/<\/?(?:html|body|script|head)/i.test(code)) blocking.push('HTMLタグが混入している');
+  const bal = scanBalance(code);
+  if (!bal.ok) blocking.push('構文エラー: ' + bal.reason);
+  return { ok: blocking.length === 0, blocking };
+}
+
+function verifyFullHtml(html) {
+  const blocking = [];
+  if (!/<\/html>\s*$/i.test(html.trim())) blocking.push('</html> で終わっていない');
+  if (html.length < 800) blocking.push('コードが短すぎる');
+  if (!html.includes('<canvas')) blocking.push('<canvas> が欠落');
+  if (!/function\s+init\b/.test(html)) blocking.push('init() が見当たらない');
+  if (!html.includes('requestAnimationFrame')) blocking.push('requestAnimationFrame がない');
+  const gi = html.search(/(?:let|const|var)\s+game\s*=/);
+  if (gi === -1) {
+    blocking.push('game オブジェクトが消失');
+  } else {
+    const around = html.slice(gi, gi + 800);
+    if (!around.includes('monsters')) blocking.push('game.monsters が消失');
+    if (!around.includes('heroes')) blocking.push('game.heroes が消失');
+    if (!around.includes('phase')) blocking.push('game.phase が消失');
+  }
+  const missingMarkers = ALL_SECTIONS.filter(name =>
+    !html.includes(`// ===SECTION:${name}===`) || !html.includes(`// ===END:${name}===`)
+  );
+  if (missingMarkers.length > 0) blocking.push(`セクションマーカーが消失: ${missingMarkers.join(', ')}`);
+  return { ok: blocking.length === 0, blocking };
+}
+
+function isPass(s) { return String(s == null ? '' : s).trim().toUpperCase() === 'PASS'; }
+
+// ============================================================
+// セクション選定（feature_registry と user_intent を考慮）
+// ============================================================
+async function selectSection(gameHtml, registry, userIntent, logs) {
   const recentSections = Array.isArray(registry.recent_sections) ? registry.recent_sections.slice(-3) : [];
   const implementedFeatures = Array.isArray(registry.implemented_features) ? registry.implemented_features : [];
   const failedApproaches = Array.isArray(registry.failed_approaches) ? registry.failed_approaches : [];
-  const nextCycle = (Number(prevDirective.cycle) || 0) + 1;
 
   const logsText = logs.length
-    ? logs.slice(-6).map(l =>
-        `- [${l.timestamp}] ${l.cycle_type}#${l.cycle_number} ${l.result} 対象:${l.target_section || '全体'} / ${l.qa_note || ''}`
-      ).join('\n')
-    : '（ログなし。初回サイクル）';
+    ? logs.slice(-5).map(l => `- [${l.timestamp}] ${l.cycle_type} 対象:${l.target_section || '?'} ${l.result}`).join('\n')
+    : '（ログなし）';
 
   const sectionDefsText = ALL_SECTIONS
     .map(k => `  ${k}${recentSections.includes(k) ? '【直近改善済み・今回は避けること】' : ''}: ${SECTION_DEFS[k]}`)
     .join('\n');
 
-  // ---- エージェント① 司令塔（セクション選定） ----
-  const commanderPrompt = `
-あなたはゲーム開発プロジェクトの司令塔です。コードは一切書きません。
-【任務】今サイクルで改善する「セクション1つ」と「具体的タスク」を決定する。
+  const prompt = `
+あなたはゲーム開発の意思決定エージェントです。
+今サイクルで改善する「セクション1つ」と「具体的タスク」を決定してください。
 
 ${GAME_SOUL}
 ${IMPL_FREEDOM}
 
-【現在の game.html 全文】
-${truncate(gameHtml, 5000)}
+【オーナーの開発意図（最優先で反映すること）】
+${userIntent || '（未設定）'}
+
+【現在のgame.html】
+${truncate(gameHtml, 4000)}
 
 【改善可能なセクション一覧】
 ${sectionDefsText}
@@ -169,147 +241,199 @@ ${sectionDefsText}
 ${recentSections.length ? recentSections.join(', ') : '（なし）'}
 
 【蓄積済み実装済み機能（繰り返し禁止）】
-${implementedFeatures.length ? implementedFeatures.slice(-15).map(f => '- ' + f).join('\n') : '（なし）'}
+${implementedFeatures.length ? implementedFeatures.slice(-12).map(f => '- ' + f).join('\n') : '（なし）'}
 
 【過去の失敗アプローチ（繰り返し禁止）】
-${failedApproaches.length ? failedApproaches.slice(-10).map(f => '- ' + f).join('\n') : '（なし）'}
+${failedApproaches.length ? failedApproaches.slice(-8).map(f => '- ' + f).join('\n') : '（なし）'}
 
-【直近の開発ログ】
+【直近ログ】
 ${logsText}
 
-重要な制約:
-- target_section は直近3件（${recentSections.join(', ') || 'なし'}）以外から必ず選ぶ。
-- specific_task は「既に実装済みの機能」を繰り返してはならない。
-- ゲームの見た目・ビジュアル・エフェクトが1990年代レベルから脱却していない場合、RENDERを優先せよ。
-
-次を厳密にJSONだけで出力してください（前置き・マークダウン・コードフェンス禁止）:
+次を厳密にJSONだけで出力してください（前置き・マークダウン禁止）:
 {
-  "target_section": "CONFIG/STATE/ECOSYSTEM/INIT_INPUT/UPDATE/RENDERのいずれか1つ",
-  "specific_task": "このセクションで実装すべき改善内容。実装者が迷わない具体度（関数名・変数名・アルゴリズムまで）で書く。",
-  "commander_note": "選定理由・全体の開発方針を2〜3文で述べる。"
+  "target_section": "直近3件以外のセクション名（CONFIG/STATE/ECOSYSTEM/INIT_INPUT/UPDATE/RENDERのいずれか）",
+  "specific_task": "このセクションで実装すべき改善内容。関数名・変数名・アルゴリズムまで具体的に。",
+  "reason": "選定理由を1文で。オーナーの意図にどう応えるかを明示すること。"
 }`;
 
-  let cmdJson = extractJson(await callGemini(commanderPrompt, { temperature: 0.5, maxOutputTokens: 2048 }));
+  let json = extractJson(await callGemini(prompt, { temperature: 0.5, maxOutputTokens: 1024 }));
 
-  // バリデーション：target_section が有効でなければフォールバック
-  if (!cmdJson || !cmdJson.target_section || !SECTION_DEFS[cmdJson.target_section]) {
+  if (!json || !json.target_section || !SECTION_DEFS[json.target_section] || recentSections.includes(json.target_section)) {
     const available = ALL_SECTIONS.filter(s => !recentSections.includes(s));
-    cmdJson = {
-      target_section: available[0] || 'RENDER',
-      specific_task: 'ゲームのビジュアル品質を向上させる。魔物・地形・勇者の描画を現代的なグラフィックに改善する。',
-      commander_note: 'フォールバック：直近未改善のセクションを選定した。'
+    const fallback = available[0] || 'RENDER';
+    json = {
+      target_section: fallback,
+      specific_task: 'ビジュアル品質を向上させる。魔物と地形の描画をより個性的にする。',
+      reason: 'フォールバック：未改善セクションを選定。'
     };
   }
-  // target_section が直近3件に含まれる場合も上書き
-  if (recentSections.includes(cmdJson.target_section)) {
-    const available = ALL_SECTIONS.filter(s => !recentSections.includes(s));
-    if (available.length > 0) {
-      cmdJson.target_section = available[0];
-      cmdJson.commander_note = `[強制ローテーション] ${cmdJson.commander_note}`;
-    }
-  }
+  return json;
+}
 
-  const targetSection = cmdJson.target_section;
-  const specificTask = String(cmdJson.specific_task || '');
-  const commanderNote = String(cmdJson.commander_note || '');
-  console.log(`--- commander → target: ${targetSection} ---\n${truncate(specificTask, 300)}`);
+// ============================================================
+// 生成→スプライス→QA（1サイクル分）
+// ============================================================
+async function generateAndReview(targetSection, specificTask, gameHtml, registry, userIntent, rejectReason) {
+  const currentSectionCode = extractSection(gameHtml, targetSection) || '（未取得）';
+  const sectionDesc = SECTION_DEFS[targetSection] || targetSection;
+  const mustPreserve = (Array.isArray(registry.implemented_features)
+    ? registry.implemented_features.filter(f => f.startsWith(`[${targetSection}]`))
+    : []);
 
-  // 現在のセクション内容を取得（ランチへ渡す）
-  const currentSectionCode = extractSection(gameHtml, targetSection) || '（セクションマーカーが見つかりません）';
-
-  // ---- エージェント② 評価 ----
-  const evalPrompt = `
-あなたは評価エージェントです。game.html を読み、7つの魂の実装度と全体品質を採点します。
+  const programmerPrompt = `
+あなたは高度なプログラマーAIです。
+指定されたセクションのJavaScriptコードのみを出力します。
 
 ${GAME_SOUL}
+${IMPL_FREEDOM}
 
-【現在の game.html 全文】
-${truncate(gameHtml, 4000)}
+【オーナーの開発意図（最優先で反映すること）】
+${userIntent || '（未設定）'}
 
-次を厳密にJSONだけで出力してください（前置き・マークダウン・コードフェンス禁止）:
-{
-  "soul_scores": [魂1〜7のスコア(0〜10の整数)。7要素固定],
-  "quality_score": 0,
-  "weakest_point": "最も弱い点を1行で",
-  "section_quality": {
-    "CONFIG": 0, "STATE": 0, "ECOSYSTEM": 0, "INIT_INPUT": 0, "UPDATE": 0, "RENDER": 0
-  }
-}`;
-  let ev = extractJson(await callGemini(evalPrompt, { temperature: 0.2, maxOutputTokens: 2048 }));
-  if (!ev || !Array.isArray(ev.soul_scores)) {
-    ev = { soul_scores: [5, 5, 5, 5, 5, 5, 5], quality_score: 50, weakest_point: '評価取得失敗', section_quality: {} };
-  }
-  const scores = [];
-  for (let i = 0; i < 7; i++) {
-    const n = Number(ev.soul_scores[i]);
-    scores.push(Number.isFinite(n) ? Math.max(0, Math.min(10, Math.round(n))) : 5);
-  }
-  ev.soul_scores = scores;
-  ev.quality_score = Number.isFinite(Number(ev.quality_score)) ? Math.round(Number(ev.quality_score)) : 50;
-  ev.section_quality = (ev.section_quality && typeof ev.section_quality === 'object') ? ev.section_quality : {};
-  console.log('--- evaluation ---\n' + JSON.stringify(ev, null, 2));
+【改善対象セクション】${targetSection}（${sectionDesc}）
 
-  // ---- エージェント③ 企画（セクション特化の仕様書） ----
-  const plannerPrompt = `
-あなたは企画エージェントです。ランチ（実装フェーズ）でプログラマーが迷わないよう、詳細な実装仕様書を作ります。
-
-${GAME_SOUL}
-
-【改善対象セクション】${targetSection}（${SECTION_DEFS[targetSection]}）
-
-【司令塔の指示】
+【今回のタスク（必ず実装すること）】
 ${specificTask}
 
-【このセクションの現在のコード】
-${truncate(currentSectionCode, 2000)}
+【現在のセクションコード（これを改善する）】
+${currentSectionCode}
 
-【評価】quality_score: ${ev.quality_score} / weakest: ${ev.weakest_point}
+【このセクションで消してはならない機能】
+${mustPreserve.length ? mustPreserve.map(x => '- ' + x).join('\n') : '- 既存の全機能（ゲームの魂7項目を壊さない範囲で改善）'}
 
-次を厳密にJSONだけで出力してください:
-{
-  "planner_spec": "このセクションで実装すべき仕様を詳細に。追加・変更すべき関数名・変数名・アルゴリズムを具体的に記述。",
-  "must_preserve_in_section": ["このセクション内で消してはならない既存の関数名・変数名・ロジックを列挙"],
-  "expected_result": "実装後にゲームがどう変わるかを1文で"
-}`;
-  let pl = extractJson(await callGemini(plannerPrompt, { temperature: 0.4, maxOutputTokens: 2048 }));
-  if (!pl) pl = {};
-  const plannerSpec = String(pl.planner_spec || specificTask);
-  const mustPreserveInSection = Array.isArray(pl.must_preserve_in_section) ? pl.must_preserve_in_section : [];
-  const expectedResult = String(pl.expected_result || '品質向上');
+${rejectReason ? `【前回の却下理由（必ず修正すること）】\n${rejectReason}\n` : ''}
 
-  // ---- morning_directive.json 生成 ----
-  const directive = {
-    date: today(),
-    cycle: nextCycle,
-    target_section: targetSection,
-    specific_task: specificTask,
-    commander_note: commanderNote,
-    evaluation: {
-      soul_scores: ev.soul_scores,
-      weakest_point: String(ev.weakest_point || ''),
-      quality_score: ev.quality_score,
-      section_quality: ev.section_quality
-    },
-    planner_spec: plannerSpec,
-    must_preserve_in_section: mustPreserveInSection,
-    expected_result: expectedResult,
-    current_section_code: truncate(currentSectionCode, 3000)
-  };
-  fs.writeFileSync('morning_directive.json', JSON.stringify(directive, null, 2) + '\n', 'utf8');
+【絶対に守ること】
+- 出力は ${targetSection} セクションのJavaScriptコードのみ。
+- HTMLタグ（<!DOCTYPE, <html, <body, <script 等）を一切含めない。
+- // ===SECTION:=== や // ===END:=== などのマーカーを含めない。
+- コードフェンス（\`\`\`）や解説文を含めない。JavaScriptコードを直接出力する。
+- 現在より明らかに品質が向上していること。変化のないコードは失敗とみなす。
+- ゲームの魂（7項目）を壊さない範囲で大胆に改善すること。`;
 
-  // ---- feature_registry.json 更新（recent_sections のみ更新） ----
-  const newRecent = [...recentSections, targetSection].slice(-4);
-  const updatedRegistry = Object.assign({}, registry, {
-    recent_sections: newRecent,
-    current_cycle: nextCycle
-  });
-  fs.writeFileSync('feature_registry.json', JSON.stringify(updatedRegistry, null, 2) + '\n', 'utf8');
+  const raw = await callGemini(programmerPrompt, { temperature: 0.75, maxOutputTokens: 8192 });
+  let sectionCode = raw.replace(/```javascript\s*/gi, '').replace(/```js\s*/gi, '').replace(/```\s*/g, '').trim();
 
-  console.log(`\n[morning] cycle#${nextCycle} → target_section: ${targetSection}`);
-  console.log(`[morning] task: ${truncate(specificTask, 200)}`);
+  const secCheck = verifySectionCode(sectionCode);
+  if (!secCheck.ok) return { pass: false, html: gameHtml, reason: '[セクション検証NG]\n' + secCheck.blocking.join('\n') };
+
+  const newHtml = replaceSection(gameHtml, targetSection, sectionCode);
+  if (!newHtml) return { pass: false, html: gameHtml, reason: `[スプライス失敗] ${targetSection} のマーカーが見つかりません。` };
+
+  if (sectionCode.trim() === currentSectionCode.trim()) {
+    return { pass: false, html: gameHtml, reason: '[変更なし] より大胆な改善を加えてください。' };
+  }
+
+  const fullCheck = verifyFullHtml(newHtml);
+  if (!fullCheck.ok) return { pass: false, html: gameHtml, reason: '[全文検証NG]\n' + fullCheck.blocking.join('\n') };
+
+  const qaPrompt = `
+あなたは品質・QAエージェントです。
+
+${GAME_SOUL}
+
+【更新後の game.html 全文】
+${truncate(newHtml, 7000)}
+
+【改善したセクション】${targetSection}
+【タスク】${specificTask}
+
+(A) 7つの魂が全て実装されているか。
+(B) <canvas>・init()・requestAnimationFrame が存在するか。
+(C) game.monsters・game.heroes・game.phase が存在するか。
+(D) JavaScriptに明らかな構文エラーがないか。
+(E) タスク「${truncate(specificTask, 80)}」が実際に実装されているか（同じコードの使い回しでないか）。
+
+全て問題なければ「PASS」の4文字のみ出力してください。問題があれば原因を1〜3行で書いてください。`;
+
+  const qa = await callGemini(qaPrompt, { temperature: 0.1, maxOutputTokens: 1024 });
+  if (!isPass(qa)) return { pass: false, html: gameHtml, reason: '[QA却下] ' + truncate(qa, 500) };
+
+  return { pass: true, html: newHtml, sectionCode, reason: 'PASS' };
+}
+
+// ============================================================
+// メイン
+// ============================================================
+async function main() {
+  const gameHtml = readFileSafe('game.html', '');
+  const registry = readJsonSafe('feature_registry.json', { recent_sections: [], implemented_features: [], failed_approaches: [] });
+  const logs = readJsonSafe('logs.json', []);
+  const intentData = readJsonSafe('user_intent.json', {});
+  const userIntent = String(intentData.intent || '');
+
+  if (!Array.isArray(logs)) throw new Error('logs.json が配列ではありません。');
+
+  if (!hasSectionMarkers(gameHtml)) {
+    console.error(`[${CYCLE_TYPE}] game.html にセクションマーカーがありません。`);
+    process.exit(1);
+  }
+
+  console.log(`[${CYCLE_TYPE}] 開始。user_intent: ${truncate(userIntent, 80)}`);
+
+  // セクション選定
+  const selection = await selectSection(gameHtml, registry, userIntent, logs);
+  const targetSection = selection.target_section;
+  const specificTask = selection.specific_task;
+  console.log(`[${CYCLE_TYPE}] 選定 → ${targetSection}: ${truncate(specificTask, 150)}`);
+
+  // 生成→QA ループ
+  const cycleNumber = logs.filter(l => l.cycle_type === CYCLE_TYPE).length + 1;
+  let result = null;
+  let lastReason = '';
+  for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
+    console.log(`\n[${CYCLE_TYPE}] 試行 ${attempt + 1}/${MAX_RETRY + 1} ...`);
+    result = await generateAndReview(targetSection, specificTask, gameHtml, registry, userIntent, lastReason);
+    if (result.pass) break;
+    lastReason = result.reason;
+    console.log(`[${CYCLE_TYPE}] 却下: ` + truncate(lastReason, 200));
+  }
+
+  const timestamp = nowStamp();
+  const implementedFeatures = Array.isArray(registry.implemented_features) ? [...registry.implemented_features] : [];
+  const failedApproaches = Array.isArray(registry.failed_approaches) ? [...registry.failed_approaches] : [];
+  const recentSections = Array.isArray(registry.recent_sections) ? [...registry.recent_sections] : [];
+
+  if (result && result.pass) {
+    fs.writeFileSync('game.html', result.html, 'utf8');
+
+    const newFeature = `[${targetSection}] ${truncate(specificTask, 80)}`;
+    if (!implementedFeatures.some(f => f.startsWith(`[${targetSection}]`) && f.includes(truncate(specificTask, 30)))) {
+      implementedFeatures.push(newFeature);
+    }
+    const newRecent = [...recentSections, targetSection].slice(-4);
+    fs.writeFileSync('feature_registry.json', JSON.stringify(
+      Object.assign({}, registry, { implemented_features: implementedFeatures.slice(-30), recent_sections: newRecent }),
+      null, 2
+    ) + '\n', 'utf8');
+
+    logs.push({
+      timestamp, cycle_type: CYCLE_TYPE, cycle_number: cycleNumber, result: 'success',
+      target_section: targetSection, task: truncate(specificTask, 200),
+      qa_note: 'PASS（AI-QA＋静的検証）', retry_count: 0
+    });
+    fs.writeFileSync('logs.json', JSON.stringify(logs, null, 2) + '\n', 'utf8');
+    console.log(`\n[${CYCLE_TYPE}] ✅ ${targetSection} セクションを更新しました（cycle#${cycleNumber}）。`);
+  } else {
+    const failNote = `[${targetSection}] ${truncate(lastReason, 60)}`;
+    if (!failedApproaches.some(f => f.startsWith(`[${targetSection}]`))) failedApproaches.push(failNote);
+    const newRecent = [...recentSections, targetSection].slice(-4);
+    fs.writeFileSync('feature_registry.json', JSON.stringify(
+      Object.assign({}, registry, { failed_approaches: failedApproaches.slice(-20), recent_sections: newRecent }),
+      null, 2
+    ) + '\n', 'utf8');
+
+    logs.push({
+      timestamp, cycle_type: CYCLE_TYPE, cycle_number: cycleNumber, result: 'failure',
+      target_section: targetSection, task: truncate(specificTask, 200),
+      qa_note: truncate(lastReason, 400), retry_count: MAX_RETRY
+    });
+    fs.writeFileSync('logs.json', JSON.stringify(logs, null, 2) + '\n', 'utf8');
+    console.log(`\n[${CYCLE_TYPE}] ❌ 全試行不合格。game.html は変更しません（cycle#${cycleNumber}）。`);
+  }
 }
 
 main().catch(err => {
-  console.error('[morning] 致命的エラー:', err && err.message ? err.message : err);
+  console.error(`[${CYCLE_TYPE}] 致命的エラー:`, err && err.message ? err.message : err);
   process.exit(1);
 });
