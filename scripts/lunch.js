@@ -1,8 +1,11 @@
 'use strict';
 /*
- * lunch.js — ランチ（実装フェーズ）
- *   morning_directive.json に従い game.html を全文生成して上書きする。
- *   QA（AIの"PASS"完全一致）＋静的検証（verifyMergedCode移植）＋出力切れガードの三段で守る。
+ * lunch.js — ランチ（外科的セクション改善フェーズ）v2
+ *   [変更点] game.html を全文書き換えではなく、1セクションのみを外科的に改善する。
+ *   - AIが生成するのは対象セクションのJSコードのみ（数十〜百行）。
+ *   - 他のセクションは一切変更しないため退行リスクがほぼゼロ。
+ *   - 差分チェックにより「何も変わっていない」ケースを失敗として検出する。
+ *   - 失敗時は feature_registry.json に failed_approaches として記録する。
  *   外部npm不使用。Node標準の https と fs のみ。
  */
 const fs = require('fs');
@@ -10,7 +13,7 @@ const https = require('https');
 
 const MODEL = 'gemini-3.1-flash-lite';
 const API_KEY = process.env.GEMINI_API_KEY || '';
-const MAX_RETRY = 2; // QA却下時の再生成回数
+const MAX_RETRY = 2;
 
 const GAME_SOUL = `
 【ゲームタイトル】破壊神のダンジョンメイカー
@@ -24,23 +27,27 @@ const GAME_SOUL = `
 5. 「勇者」がダンジョンへ自律的に侵攻してくる（プレイヤー操作ではなくAIで動く）。
 6. プレイヤー（魔王）は勇者を直接攻撃できない。生態系・地形を介して間接的にしか干渉できない。
 7. 魔物が全滅したら敗北。勇者を全滅させられたらクリアし、次のラウンドへ進む。
-
-※ これら7項目はゲームの存在理由そのものです。どの提案・実装も、この魂を一つたりとも
-　 壊さない・薄めない・例外を作らないことを最優先の制約とします。
 `;
 
 const IMPL_FREEDOM = `
-【自由に創意工夫してよい領域（層2：むしろ大胆に拡張・改善することを推奨）】
-- 操作方法（WASD / マウス / Shift連動 / ドラッグ / ホイール など、何でもよい）
-- ビジュアル表現・グラフィック・色彩・ライティング・アニメーション
+【自由に創意工夫してよい領域（層2：大胆に拡張・改善することを推奨）】
+- ビジュアル表現・グラフィック・色彩・ライティング・アニメーション・パーティクル
 - UIレイアウト・情報の見せ方・HUD・ミニマップ・ステータス表示
 - 魔物の種類・名前・能力値・成長曲線・捕食関係のデザイン
 - 勇者の戦略・AI・侵攻パターン・職業/編成
-- 演出・エフェクト・画面効果・サウンド表現・カメラワーク
-
-※ 階層1の魂を一切壊さない範囲であれば、ここは自由に・マニアックに尖らせてよい領域です。
-　 ブラウザのウィンドウ全体に自動フィットする前提で設計すること。
+- 演出・エフェクト・画面効果・カメラワーク
+- 操作方法（ドラッグ・ホイール・Shift連動など）
 `;
+
+// セクション定義（morning.js と同じ内容を保つこと）
+const SECTION_DEFS = {
+  CONFIG:     '定数・Canvas初期化・グリッドサイズ(COLS/ROWS)・TILE計算・HUD高さ・mouseX/Y変数。',
+  STATE:      'gameオブジェクト定義。monsters/heroes/phase/round/digsLeft/map/grid/message。新状態変数はここ。',
+  ECOSYSTEM:  'mutate()・createMonster()・遺伝子継承・updateGrid()・resize()。魔物生成と生態系の核。',
+  INIT_INPUT: 'init()（ラウンド初期化）とonDig()（クリック掘削ハンドラ）。掘削制限・魔物自動生成・勇者出現。',
+  UPDATE:     'update(dt)。毎フレームの魔物移動・捕食・繁殖・勇者AI侵攻・攻撃・勝敗判定。',
+  RENDER:     'render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。'
+};
 
 // ============================================================
 // Gemini API（503/429 指数バックオフ最大5回）
@@ -76,102 +83,66 @@ async function callGemini(prompt, generationConfig) {
   for (let attempt = 0; attempt <= 5; attempt++) {
     const res = await postGemini(prompt, generationConfig);
     let json;
-    try { json = JSON.parse(res.text); }
-    catch (e) { throw new Error(`[${MODEL}] 応答がJSONではありません: ${truncate(res.text, 300)}`); }
-
-    const t = json &&
-      json.candidates && json.candidates[0] &&
+    try { json = JSON.parse(res.text); } catch (e) { throw new Error(`応答がJSONではありません: ${truncate(res.text, 300)}`); }
+    const t = json && json.candidates && json.candidates[0] &&
       json.candidates[0].content && json.candidates[0].content.parts &&
       json.candidates[0].content.parts[0] && json.candidates[0].content.parts[0].text;
     if (t) return t;
-
     const code = (json && json.error && json.error.code) || res.status;
     if ((code === 503 || code === 429) && attempt < 5) {
-      console.log(`[${MODEL}] ${code} 発生。${waits[attempt]}秒後にリトライ (${attempt + 1}/5)`);
+      console.log(`[${MODEL}] ${code} → ${waits[attempt]}秒後にリトライ (${attempt + 1}/5)`);
       await sleep(waits[attempt] * 1000);
       continue;
     }
-    throw new Error(`[${MODEL}] APIエラー(code=${code}): ${truncate(res.text, 400)}`);
+    throw new Error(`APIエラー(code=${code}): ${truncate(res.text, 400)}`);
   }
-  throw new Error(`[${MODEL}] リトライ上限。応答を取得できませんでした。`);
+  throw new Error('リトライ上限。応答を取得できませんでした。');
 }
 
 // ============================================================
 // ユーティリティ
 // ============================================================
 function truncate(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n) + '…' : s; }
-function readFileSafe(p, fallback) { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return fallback; } }
-function readJsonSafe(p, fallback) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; } }
+function readFileSafe(p, fb) { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return fb; } }
+function readJsonSafe(p, fb) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fb; } }
 function nowStamp() {
   const d = new Date();
   const p = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// AI出力から <!DOCTYPE html> 〜 </html> を抜き出す（コードフェンス混入に耐える）
-function extractHtml(text) {
-  let s = String(text == null ? '' : text);
-  s = s.replace(/```html/gi, '').replace(/```/g, '');
-  const lower = s.toLowerCase();
-  const start = lower.indexOf('<!doctype');
-  const end = lower.lastIndexOf('</html>');
-  if (start !== -1 && end !== -1 && end > start) return s.slice(start, end + '</html>'.length);
-  return s.trim();
+// ============================================================
+// セクション操作
+// ============================================================
+function extractSection(html, name) {
+  const startTag = `// ===SECTION:${name}===`;
+  const endTag = `// ===END:${name}===`;
+  const s = html.indexOf(startTag);
+  const e = html.indexOf(endTag);
+  if (s === -1 || e === -1 || e < s) return null;
+  return html.slice(s + startTag.length, e).trim();
+}
+
+function replaceSection(html, name, newContent) {
+  const startTag = `// ===SECTION:${name}===`;
+  const endTag = `// ===END:${name}===`;
+  const s = html.indexOf(startTag);
+  const e = html.indexOf(endTag);
+  if (s === -1 || e === -1 || e < s) return null;
+  return html.slice(0, s + startTag.length) + '\n' + newContent + '\n' + html.slice(e);
+}
+
+function hasSectionMarkers(html) {
+  return Object.keys(SECTION_DEFS).every(name =>
+    html.includes(`// ===SECTION:${name}===`) && html.includes(`// ===END:${name}===`)
+  );
 }
 
 // ============================================================
-// 静的検証（GASの verifyMergedCode を移植・全文版に適応）
-//   blocking が1つでもあれば不合格。
+// 括弧・文字列の対応チェック（GAS版移植）
 // ============================================================
-function verifyGameHtml(code, mustPreserve) {
-  const blocking = [];
-
-  // (A) 出力切れガード（64Kトークン天井対策）
-  if (!/<\/html>\s*$/i.test(code.trim())) blocking.push('・</html> で終わっていない（出力が途中で切れた可能性）');
-  if (code.length < 800) blocking.push('・コードが短すぎる（生成失敗の可能性）');
-
-  // (B) 必須の骨格
-  if (code.indexOf('<script>') === -1 || code.indexOf('</script>') === -1) blocking.push('・<script>〜</script> が欠落');
-  if (code.indexOf('<canvas') === -1) blocking.push('・<canvas> が欠落');
-  if (!/function\s+init\b/.test(code)) blocking.push('・init() が見当たらない（初期化が消えた）');
-  if (code.indexOf('requestAnimationFrame') === -1) blocking.push('・requestAnimationFrame が無い（ゲームループが止まる）');
-
-  // (C) 括弧・文字列の対応
-  const bal = scanBalance(code);
-  if (!bal.ok) blocking.push('・構文: ' + bal.reason);
-
-  // (D) game オブジェクトの構造ガード（魂のデータ消失を防ぐ）
-  const gi = code.search(/(?:let|const|var)\s+game\s*=/);
-  if (gi === -1) {
-    blocking.push('・game オブジェクトの定義が消失');
-  } else {
-    const around = code.slice(gi, gi + 800);
-    if (around.indexOf('monsters') === -1) blocking.push('・game に monsters（魔物配列）が無い');
-    if (around.indexOf('heroes') === -1) blocking.push('・game に heroes（勇者配列）が無い');
-    if (around.indexOf('phase') === -1) blocking.push('・game に phase（進行状態）が無い');
-  }
-
-  // (E) must_preserve のキーワード残存チェック（消してはならない機能の見張り。警告→ここでは致命扱い）
-  const missing = [];
-  (Array.isArray(mustPreserve) ? mustPreserve : []).forEach(item => {
-    const kw = pickKeyword(item);
-    if (kw && code.indexOf(kw) === -1) missing.push(`${item}（手掛かり語:"${kw}"）`);
-  });
-  if (missing.length) blocking.push('・must_preserve の痕跡が見当たらない: ' + missing.join(' / '));
-
-  return { ok: blocking.length === 0, blocking };
-}
-
-// must_preserve文字列から、コード内に残るべき英数字キーワードを1つ拾う
-function pickKeyword(item) {
-  const m = String(item).match(/[A-Za-z_][A-Za-z0-9_]{2,}/);
-  return m ? m[0] : '';
-}
-
-// 括弧 {} () [] と文字列・コメントの対応をスキャン（GAS _scanBalance 移植）
 function scanBalance(code) {
   const depth = { '{': 0, '(': 0, '[': 0 };
-  const open = { '{': 1, '(': 1, '[': 1 };
   const close = { '}': '{', ')': '(', ']': '[' };
   let inStr = null, lineC = false, blockC = false;
   for (let i = 0; i < code.length; i++) {
@@ -182,80 +153,179 @@ function scanBalance(code) {
     if (c === '/' && n === '/') { lineC = true; i++; continue; }
     if (c === '/' && n === '*') { blockC = true; i++; continue; }
     if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
-    if (open[c]) depth[c]++;
-    else if (close[c]) { const o = close[c]; depth[o]--; if (depth[o] < 0) return { ok: false, reason: `'${c}' が余分（閉じ括弧過多）` }; }
+    if (depth[c] !== undefined) depth[c]++;
+    else if (close[c]) {
+      const o = close[c];
+      depth[o]--;
+      if (depth[o] < 0) return { ok: false, reason: `'${c}' が余分（閉じ括弧過多）` };
+    }
   }
-  if (depth['{'] || depth['('] || depth['[']) return { ok: false, reason: `括弧の対応が不一致 {:${depth['{']} (:${depth['(']} [:${depth['[']}` };
+  if (depth['{'] || depth['('] || depth['[']) {
+    return { ok: false, reason: `括弧の対応が不一致 {:${depth['{']} (:${depth['(']} [:${depth['[']}` };
+  }
   if (inStr) return { ok: false, reason: '文字列リテラルが閉じていない' };
   if (blockC) return { ok: false, reason: 'ブロックコメントが閉じていない' };
   return { ok: true };
 }
 
-// QAは "PASS" の完全一致のみ通す（前後の空白・改行のみ許容）
+// ============================================================
+// セクション生成物の静的検証
+// ============================================================
+function verifySectionCode(code) {
+  const blocking = [];
+  if (!code || code.length < 30) blocking.push('コードが短すぎる（生成失敗の可能性）');
+  if (code.includes('// ===SECTION:') || code.includes('// ===END:')) {
+    blocking.push('セクションマーカーが混入している（内容のみを出力すること）');
+  }
+  if (/<\/?(?:html|body|script|head|doctype)/i.test(code)) {
+    blocking.push('HTMLタグが混入している（JavaScriptコードのみを出力すること）');
+  }
+  const bal = scanBalance(code);
+  if (!bal.ok) blocking.push('構文エラー: ' + bal.reason);
+  return { ok: blocking.length === 0, blocking };
+}
+
+// ============================================================
+// スプライス後の全文静的検証
+// ============================================================
+function verifyFullHtml(html) {
+  const blocking = [];
+  if (!/<\/html>\s*$/i.test(html.trim())) blocking.push('</html> で終わっていない');
+  if (html.length < 800) blocking.push('コードが短すぎる');
+  if (!html.includes('<canvas')) blocking.push('<canvas> が欠落');
+  if (!/function\s+init\b/.test(html)) blocking.push('init() が見当たらない');
+  if (!html.includes('requestAnimationFrame')) blocking.push('requestAnimationFrame がない');
+  const gi = html.search(/(?:let|const|var)\s+game\s*=/);
+  if (gi === -1) {
+    blocking.push('game オブジェクトの定義が消失');
+  } else {
+    const around = html.slice(gi, gi + 800);
+    if (!around.includes('monsters')) blocking.push('game.monsters が消失');
+    if (!around.includes('heroes')) blocking.push('game.heroes が消失');
+    if (!around.includes('phase')) blocking.push('game.phase が消失');
+  }
+  // セクションマーカーの存在確認（AIが誤って全文書き換えした場合の検出）
+  const missingMarkers = Object.keys(SECTION_DEFS).filter(name =>
+    !html.includes(`// ===SECTION:${name}===`) || !html.includes(`// ===END:${name}===`)
+  );
+  if (missingMarkers.length > 0) blocking.push(`セクションマーカーが消失: ${missingMarkers.join(', ')}`);
+  return { ok: blocking.length === 0, blocking };
+}
+
 function isPass(s) { return String(s == null ? '' : s).trim().toUpperCase() === 'PASS'; }
 
 // ============================================================
-// 1サイクル分の生成→QA
+// 1サイクル分：セクション生成 → スプライス → QA
 // ============================================================
-async function generateAndReview(designSpec, currentHtml, directive, rejectReason) {
-  const mustPreserve = (directive && directive.must_preserve) || [];
+async function generateAndReview(directive, currentHtml, rejectReason) {
+  const targetSection = directive.target_section;
+  const specificTask = directive.specific_task || '';
+  const plannerSpec = directive.planner_spec || specificTask;
+  const mustPreserveInSection = Array.isArray(directive.must_preserve_in_section)
+    ? directive.must_preserve_in_section : [];
+  const currentSectionCode = extractSection(currentHtml, targetSection)
+    || directive.current_section_code || '（未取得）';
+  const sectionDesc = SECTION_DEFS[targetSection] || targetSection;
 
+  // ---- プログラマーエージェント（セクション単体を生成） ----
   const programmerPrompt = `
-あなたは高度なプログラマーAIです。指示書を忠実にコードへ翻訳し、game.html を【全文】出力します。
+あなたは高度なプログラマーAIです。
+指定されたセクションのJavaScriptコードのみを出力します。
 
 ${GAME_SOUL}
 ${IMPL_FREEDOM}
 
-【実装指示書（設計エージェント作）】
-${designSpec}
+【改善対象セクション】${targetSection}
+【セクションの役割】${sectionDesc}
 
-【現在の game.html 全文】
-${currentHtml}
+【今回のタスク（必ず実装すること）】
+${specificTask}
 
-【絶対に消してはならない機能（must_preserve）】
-${(mustPreserve.length ? mustPreserve.map(x => '- ' + x).join('\n') : '- 7つの魂すべて')}
-${rejectReason ? `\n【前回QAの却下理由（必ず修正すること）】\n${rejectReason}\n` : ''}
+【詳細仕様】
+${plannerSpec}
 
-実装上の絶対ルール:
-- 層1の7つの魂を壊す・無効化する・例外を作る変更は禁止。
-- must_preserve の機能を全て残すこと。
-- 差分JSONやセクションマーカー（##SECTION##等）は一切使わない。完成した game.html を全文出力する。
-- <!DOCTYPE html> から </html> まで、ブラウザで直接開いて単体で動く完結したHTMLを出力する。
-- <canvas>・init()・requestAnimationFrame を必ず含む。game オブジェクトには monsters / heroes / phase を必ず持たせる。
-- キャンバスはブラウザのウィンドウ全体に自動フィットさせる（固定サイズのダイアログ前提にしない）。
-- 出力は game.html の中身そのものだけ。前置き・解説・コードフェンス（\`\`\`）は一切付けない。`;
+【現在のセクションコード（これを改善する）】
+${currentSectionCode}
 
-  const raw = await callGemini(programmerPrompt, { temperature: 0.7, maxOutputTokens: 32768 });
-  const html = extractHtml(raw);
+【このセクション内で消してはならない機能・関数】
+${mustPreserveInSection.length ? mustPreserveInSection.map(x => '- ' + x).join('\n') : '- 既存の全機能（ゲームの魂7項目を壊さない範囲で改善）'}
 
-  // 静的検証（AIに渡す前に機械チェック。出力切れ・骨格欠落・魂消失を弾く）
-  const staticCheck = verifyGameHtml(html, mustPreserve);
-  if (!staticCheck.ok) {
-    return { pass: false, html, reason: '[静的検証NG]\n' + staticCheck.blocking.join('\n') };
+${rejectReason ? `【前回の却下理由（必ず修正すること）】\n${rejectReason}\n` : ''}
+
+【絶対に守ること】
+- 出力は ${targetSection} セクションのJavaScriptコードのみ。
+- <!DOCTYPE, <html, <body, <script, </script>, </html> などのHTMLタグを一切含めない。
+- // ===SECTION:=== や // ===END:=== などのマーカーを含めない。
+- コードフェンス（\`\`\`）や解説文を含めない。JavaScriptコードを直接出力する。
+- ゲームの魂（7項目）を壊さない範囲で、大胆かつ具体的に改善すること。
+- 現在より明らかに品質が向上していること。同じコードの出力は失敗とみなす。`;
+
+  const raw = await callGemini(programmerPrompt, { temperature: 0.75, maxOutputTokens: 8192 });
+
+  // コードフェンス除去
+  let sectionCode = raw
+    .replace(/```javascript\s*/gi, '')
+    .replace(/```js\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  // セクション単体の静的検証
+  const secCheck = verifySectionCode(sectionCode);
+  if (!secCheck.ok) {
+    return { pass: false, html: currentHtml, reason: '[セクション検証NG]\n' + secCheck.blocking.join('\n') };
   }
 
-  // QAエージェント（"PASS" 完全一致でのみ通す）
+  // スプライス：対象セクションのみ置換
+  const newHtml = replaceSection(currentHtml, targetSection, sectionCode);
+  if (!newHtml) {
+    return {
+      pass: false, html: currentHtml,
+      reason: `[スプライス失敗] ${targetSection} セクションのマーカーが game.html に見つかりません。`
+    };
+  }
+
+  // 差分チェック（変更がなければ失敗）
+  if (sectionCode.trim() === currentSectionCode.trim()) {
+    return {
+      pass: false, html: currentHtml,
+      reason: '[変更なし] セクションのコードが変更されませんでした。より大胆な改善を加えてください。'
+    };
+  }
+
+  // スプライス後の全文静的検証
+  const fullCheck = verifyFullHtml(newHtml);
+  if (!fullCheck.ok) {
+    return { pass: false, html: currentHtml, reason: '[全文検証NG]\n' + fullCheck.blocking.join('\n') };
+  }
+
+  // QAエージェント（全文を検証）
   const qaPrompt = `
 あなたは品質・QAエージェントです。最後の砦として、魂と構造を守る門番です。
 
 ${GAME_SOUL}
 
-【生成された game.html 全文】
-${html}
+【更新後の game.html 全文】
+${truncate(newHtml, 7000)}
 
-次の観点で最終確認してください:
-(A) 7つの魂が全て実装されているか（一つでも壊れ・形骸化があれば不合格）。
+【今回改善したセクション】${targetSection}
+【今回のタスク】${specificTask}
+
+次の観点で確認してください:
+(A) 7つの魂がすべて実装されているか（形骸化も含め）。
 (B) <canvas>・init()・requestAnimationFrame が存在するか。
-(C) JavaScriptに明らかな構文崩壊（閉じ括弧不足など）がないか。
-(D) must_preserve の機能が全て含まれているか:
-${(mustPreserve.length ? mustPreserve.map(x => '- ' + x).join('\n') : '- 7つの魂すべて')}
+(C) game.monsters・game.heroes・game.phase が存在するか。
+(D) JavaScriptに明らかな構文エラーがないか。
+(E) 今回のタスク「${truncate(specificTask, 100)}」が実際に実装されているか（同じコードの使い回しでないか）。
 
-すべて問題なければ、半角4文字「PASS」だけを出力してください（前後に文字・記号・改行説明を一切付けない）。
-問題があれば「PASS」とは絶対に書かず、どの観点(A/B/C/D)で何が問題かを1〜3行で出力してください。`;
+すべて問題なければ「PASS」の4文字のみ出力してください（前後に何も付けない）。
+問題があれば「PASS」とは書かず、観点(A)〜(E)で何が問題かを1〜3行で書いてください。`;
+
   const qa = await callGemini(qaPrompt, { temperature: 0.1, maxOutputTokens: 1024 });
-  if (!isPass(qa)) return { pass: false, html, reason: '[QA却下] ' + truncate(qa, 500) };
+  if (!isPass(qa)) {
+    return { pass: false, html: currentHtml, reason: '[QA却下] ' + truncate(qa, 500) };
+  }
 
-  return { pass: true, html, reason: 'PASS' };
+  return { pass: true, html: newHtml, sectionCode, reason: 'PASS' };
 }
 
 // ============================================================
@@ -264,81 +334,94 @@ ${(mustPreserve.length ? mustPreserve.map(x => '- ' + x).join('\n') : '- 7つの
 async function main() {
   const currentHtml = readFileSafe('game.html', '');
   const directive = readJsonSafe('morning_directive.json', {});
+  const registry = readJsonSafe('feature_registry.json', { implemented_features: [], failed_approaches: [] });
   const logs = readJsonSafe('logs.json', []);
   if (!Array.isArray(logs)) throw new Error('logs.json が配列ではありません。');
 
-  const logsText = logs.length
-    ? logs.slice(-8).map(l => `- [${l.timestamp}] ${l.cycle_type}#${l.cycle_number} ${l.result}: ${l.changes || ''}`).join('\n')
-    : '（ログなし）';
-  const priority = (directive && directive.priority) || '7つの魂が全て動作する基礎実装の確立';
-  const cycleNumber = (logs.filter(l => l.cycle_type === 'lunch').length) + 1;
+  // セクションマーカーチェック
+  if (!hasSectionMarkers(currentHtml)) {
+    console.error('[lunch] game.html にセクションマーカーがありません。朝礼が先行している必要があります。');
+    console.error('[lunch] 必要なマーカー: // ===SECTION:CONFIG=== 〜 // ===SECTION:RENDER===');
+    process.exit(1);
+  }
 
-  // ---- エージェント① 設計 ----
-  const designPrompt = `
-あなたは設計エージェントです。「何をどう変えるか」の詳細実装仕様書を作ります。コードは書きません。
+  // morning_directive からターゲットセクションを取得
+  const targetSection = directive.target_section;
+  if (!targetSection || !SECTION_DEFS[targetSection]) {
+    console.error(`[lunch] morning_directive.json に有効な target_section がありません（値: ${targetSection}）。朝礼を先に実行してください。`);
+    process.exit(1);
+  }
 
-${GAME_SOUL}
-${IMPL_FREEDOM}
+  const cycleNumber = logs.filter(l => l.cycle_type === 'lunch').length + 1;
+  console.log(`[lunch] cycle#${cycleNumber} → 対象セクション: ${targetSection}`);
+  console.log(`[lunch] タスク: ${truncate(directive.specific_task, 200)}`);
 
-【朝礼の結論 morning_directive.json】
-${JSON.stringify(directive, null, 2)}
-
-【現在の game.html 全文】
-${currentHtml}
-
-【過去ログ（失敗パターン把握用・最大8件）】
-${logsText}
-
-次を必ず網羅した実装仕様書を、日本語プレーンテキストで出力してください:
-1. 目的（このサイクルで何を達成するか／どの魂を深掘りするか）
-2. 変更箇所（既存のどこを直すか）と新設箇所
-3. 状態変数（monsters/heroes/round/digsLeft/phase 等）への具体的影響
-4. 不変条件（must_preserve と 7つの魂を壊さないために守ること）
-5. 完成基準（何が動けば成功とみなすか）
-朝礼の priority「${priority}」を最優先にすること。`;
-  const designSpec = (await callGemini(designPrompt, { temperature: 0.4, maxOutputTokens: 4096 })).trim();
-  console.log('--- design_spec ---\n' + truncate(designSpec, 1200));
-
-  // ---- ②プログラマー → ③QA（最大 MAX_RETRY 回まで再生成） ----
+  // ---- プログラマー → QA（最大 MAX_RETRY 回） ----
   let result = null;
   let lastReason = '';
   for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
-    console.log(`\n[lunch] 生成試行 ${attempt + 1}/${MAX_RETRY + 1} ...`);
-    result = await generateAndReview(designSpec, currentHtml, directive, lastReason);
+    console.log(`\n[lunch] 試行 ${attempt + 1}/${MAX_RETRY + 1} ...`);
+    result = await generateAndReview(directive, currentHtml, lastReason);
     if (result.pass) break;
     lastReason = result.reason;
-    console.log('[lunch] 却下: ' + truncate(lastReason, 400));
+    console.log('[lunch] 却下: ' + truncate(lastReason, 300));
   }
 
   const timestamp = nowStamp();
+  const implementedFeatures = Array.isArray(registry.implemented_features) ? registry.implemented_features : [];
+  const failedApproaches = Array.isArray(registry.failed_approaches) ? registry.failed_approaches : [];
+
   if (result && result.pass) {
     fs.writeFileSync('game.html', result.html, 'utf8');
+
+    // feature_registry.json の実装済み機能を追加（重複なし・最大30件）
+    const newFeature = `[${targetSection}] ${truncate(directive.specific_task, 80)}`;
+    if (!implementedFeatures.some(f => f.startsWith(`[${targetSection}]`) &&
+        f.includes(truncate(directive.specific_task, 40)))) {
+      implementedFeatures.push(newFeature);
+    }
+    const updatedRegistry = Object.assign({}, registry, {
+      implemented_features: implementedFeatures.slice(-30)
+    });
+    fs.writeFileSync('feature_registry.json', JSON.stringify(updatedRegistry, null, 2) + '\n', 'utf8');
+
     logs.push({
       timestamp,
       cycle_type: 'lunch',
       cycle_number: cycleNumber,
       result: 'success',
-      priority,
-      changes: truncate(designSpec.replace(/\s+/g, ' '), 300),
-      qa_note: 'PASS（AI-QA＋静的検証）',
+      target_section: targetSection,
+      task: truncate(directive.specific_task, 200),
+      changes: truncate(directive.planner_spec || '', 300),
+      qa_note: 'PASS（AI-QA＋静的検証＋差分確認）',
       retry_count: 0
     });
     fs.writeFileSync('logs.json', JSON.stringify(logs, null, 2) + '\n', 'utf8');
-    console.log(`\n[lunch] ✅ QA合格。game.html を上書きしました（cycle#${cycleNumber}）。`);
+    console.log(`\n[lunch] ✅ QA合格。${targetSection} セクションを更新しました（cycle#${cycleNumber}）。`);
   } else {
-    // 2回失敗 → game.html は変更せず、失敗ログのみ
+    // 失敗時：failed_approaches に記録（重複なし・最大20件）
+    const failNote = `[${targetSection}] ${truncate(lastReason, 80)}`;
+    if (!failedApproaches.some(f => f.includes(truncate(lastReason, 40)))) {
+      failedApproaches.push(failNote);
+    }
+    const updatedRegistry = Object.assign({}, registry, {
+      failed_approaches: failedApproaches.slice(-20)
+    });
+    fs.writeFileSync('feature_registry.json', JSON.stringify(updatedRegistry, null, 2) + '\n', 'utf8');
+
     logs.push({
       timestamp,
       cycle_type: 'lunch',
       cycle_number: cycleNumber,
       result: 'failure',
-      priority,
+      target_section: targetSection,
+      task: truncate(directive.specific_task, 200),
       changes: 'なし（QA不合格のため game.html 非変更）',
       qa_note: truncate(lastReason, 400),
       retry_count: MAX_RETRY
     });
     fs.writeFileSync('logs.json', JSON.stringify(logs, null, 2) + '\n', 'utf8');
-    console.log(`\n[lunch] ❌ ${MAX_RETRY + 1}回とも不合格。game.html は変更しません（cycle#${cycleNumber}）。`);
+    console.log(`\n[lunch] ❌ 全試行不合格。game.html は変更しません（cycle#${cycleNumber}）。`);
   }
 }
 
