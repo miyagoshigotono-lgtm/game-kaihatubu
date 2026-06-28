@@ -22,7 +22,7 @@
       round: 1,
       digsLeft: 10,
       phase: 'dig',
-      map: [], // 数値: 0.0〜1.0 (栄養密度)
+      map: [], 
       monsters: [],
       heroes: [],
       message: '魔王よ、地面を掘り、魔物の揺りかごを作れ'
@@ -54,11 +54,11 @@
       const cy = Math.floor((e.clientY - rect.top) / TILE);
       if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy] > 0) return;
       
-      game.map[cx][cy] = 0.2; // 空間確保
+      game.map[cx][cy] = 0.5; 
       game.digsLeft--;
       
-      if (Math.random() < 0.6) {
-        game.monsters.push({ x: cx, y: cy, hp: 10, maxHp: 10, atk: 2, hunger: 100, mutation: 0, type: Math.random() > 0.3 ? 0 : 1 });
+      if (Math.random() < 0.7) {
+        game.monsters.push({ x: cx, y: cy, hp: 10, maxHp: 10, atk: 2, hunger: 100, mutation: 0, type: Math.random() > 0.4 ? 0 : 1 });
       }
 
       if (game.digsLeft <= 0) {
@@ -71,69 +71,67 @@
     }
 
     function update(dt) {
-      // 栄養密度の時間減衰
       for(let x=0; x<COLS; x++) {
         for(let y=0; y<ROWS; y++) {
-          if (game.map[x][y] > 0) game.map[x][y] = Math.max(0, game.map[x][y] - 0.05 * dt);
+          if (game.map[x][y] > 0) game.map[x][y] = Math.max(0, game.map[x][y] - 0.02 * dt);
         }
       }
 
       if (game.phase !== 'battle') return;
 
+      const densityMap = Array.from({ length: COLS }, () => Array(ROWS).fill(0));
+      game.monsters.forEach(m => densityMap[m.x][m.y]++);
+
       for (let i = game.monsters.length - 1; i >= 0; i--) {
         let m = game.monsters[i];
-        let density = game.map[m.x][m.y];
+        let d = game.map[m.x][m.y];
+        let density = densityMap[m.x][m.y];
         
-        // ステータス更新
-        m.mutation += density * dt;
-        let power = 1 + density;
-        m.maxHp = 10 * power;
-        m.atk = 2 * power;
-        m.hunger -= 10 * dt;
+        let metabolicRate = 10 * (1 + (density / (d + 0.1)));
+        m.hunger -= metabolicRate * dt;
+        
+        if (d < 0.1) m.hunger -= 20 * dt; 
 
-        // 捕食
         if (m.type === 1) {
           game.monsters.forEach(target => {
             if (target.type === 0 && target.x === m.x && target.y === m.y) {
-              m.hunger += 50; target.hp = -1;
+              m.hunger += 40; target.hp = -1;
             }
           });
         }
 
-        // 繁殖
-        if (m.hunger >= 150) {
-          m.hunger -= 70;
+        if (m.hunger >= 150 && d > 0.3) {
+          m.hunger -= 80;
           game.monsters.push({ x: m.x, y: m.y, hp: 15, maxHp: 15, atk: 3, hunger: 50, mutation: 0, type: m.type });
         }
 
-        // 移動
-        if (Math.random() < 0.1) {
-          m.x = Math.max(0, Math.min(COLS - 1, m.x + Math.floor(Math.random()*3)-1));
-          m.y = Math.max(0, Math.min(ROWS - 1, m.y + Math.floor(Math.random()*3)-1));
+        if (Math.random() < 0.05) {
+          m.x = Math.max(0, Math.min(COLS - 1, m.x + (Math.random() > 0.5 ? 1 : -1)));
+          m.y = Math.max(0, Math.min(ROWS - 1, m.y + (Math.random() > 0.5 ? 1 : -1)));
         }
 
         if (m.hunger <= 0 || m.hp <= 0) {
-          game.map[m.x][m.y] = Math.min(1.0, game.map[m.x][m.y] + 0.5);
+          game.map[m.x][m.y] = Math.min(1.0, game.map[m.x][m.y] + 0.3);
           game.monsters.splice(i, 1);
         }
       }
 
       game.heroes.forEach((h, idx) => {
         h.t += dt;
-        if (h.t > 0.5) {
+        if (h.t > 0.8) {
           h.t = 0;
           let target = game.monsters.find(m => m.x === h.x && m.y === h.y);
-          if (target) target.hp -= 2;
+          if (target) target.hp -= 5;
           else {
-            if (Math.random() < 0.5) h.x = Math.min(COLS-1, h.x + 1);
-            else h.y = Math.min(ROWS-1, h.y + (Math.random() > 0.5 ? 1 : -1));
+            if (h.x < COLS - 1) h.x++;
+            else if (Math.random() < 0.3) h.y = Math.max(0, Math.min(ROWS-1, h.y + (Math.random()>0.5?1:-1)));
           }
         }
         if (h.hp <= 0) game.heroes.splice(idx, 1);
       });
 
       if (game.monsters.length === 0 && game.phase === 'battle') { game.phase = 'over'; game.message = '敗北... クリックで再挑戦'; }
-      else if (game.heroes.length === 0 && game.phase === 'battle') { game.round++; game.phase = 'dig'; game.digsLeft = 10 + (game.round - 1) * 2; game.message = '防衛成功！'; }
+      else if (game.heroes.length === 0 && game.phase === 'battle') { game.round++; game.phase = 'dig'; game.digsLeft = 10 + (game.round - 1) * 2; game.message = '防衛成功！次の階層へ'; }
     }
 
     function render() {
@@ -141,19 +139,21 @@
       for (let x = 0; x < COLS; x++) {
         for (let y = 0; y < ROWS; y++) {
           let d = game.map[x][y];
-          ctx.fillStyle = d > 0 ? `rgb(0, ${Math.floor(d * 150)}, 0)` : '#111';
+          ctx.fillStyle = `rgb(${d*100}, 0, 0)`;
           ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
         }
       }
       game.monsters.forEach(m => {
-        ctx.fillStyle = m.type === 1 ? '#f66' : '#4af';
-        ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, (TILE/3) * (0.5 + m.mutation/5), 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = m.type === 1 ? '#ff4444' : '#4488ff';
+        ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/4, 0, Math.PI*2); ctx.fill();
       });
       game.heroes.forEach(h => { ctx.fillStyle = '#fff'; ctx.fillRect(h.x * TILE + 5, h.y * TILE + 5, TILE - 10, TILE - 10); });
       
       ctx.fillStyle = '#fff';
+      ctx.font = '16px monospace';
       ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 40);
       ctx.fillText(game.message, 20, ROWS * TILE + 70);
+      ctx.fillText("赤色強度: 栄��密度(環境収容力)", 20, ROWS * TILE + 100);
     }
 
     let last = 0;
