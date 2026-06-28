@@ -27,8 +27,20 @@
       monsters: [],
       grid: [],
       heroes: [],
+      particles: [],
       message: '魔王よ、地面を掘り、魔物の揺りかごを作れ'
     };
+
+    function addParticle(x, y, color, life = 1.0) {
+      game.particles.push({
+        x: x * TILE + TILE / 2,
+        y: y * TILE + TILE / 2,
+        vx: (Math.random() - 0.5) * 50,
+        vy: (Math.random() - 0.5) * 50,
+        life: life,
+        color: color
+      });
+    }
 
     function mutate(val, nutrient) {
       const factor = Math.max(0.2, Math.min(1.0, nutrient / 5.0));
@@ -72,6 +84,7 @@
       game.map = Array.from({ length: COLS }, () => Array(ROWS).fill(0.0));
       game.monsters = [];
       game.heroes = [];
+      game.particles = [];
       game.phase = 'dig';
       game.digsLeft = 10 + (game.round - 1) * 2;
       game.message = 'ラウンド ' + game.round + '：ダンジョンを掘り進めよ';
@@ -104,6 +117,11 @@
     }
 
     function update(dt) {
+      game.particles.forEach((p, i) => {
+        p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+        if(p.life <= 0) game.particles.splice(i, 1);
+      });
+
       if (game.phase === 'battle') {
         const predators = game.monsters.filter(m => m.type === 1);
         const preys = game.monsters.filter(m => m.type === 0);
@@ -122,6 +140,7 @@
             if (preyIdx !== -1) {
               m.energy += game.grid[m.x][m.y][preyIdx].energy;
               game.grid[m.x][m.y][preyIdx].energy = -1; 
+              for(let k=0; k<5; k++) addParticle(m.x, m.y, '#ff00ff');
             }
           }
 
@@ -135,6 +154,7 @@
           if (m.energy > m.genes.reproThreshold && game.map[m.x][m.y] > 0.2) {
             m.energy /= 2;
             game.monsters.push(createMonster(m.x, m.y, m.type, m.genes, game.map[m.x][m.y]));
+            for(let k=0; k<3; k++) addParticle(m.x, m.y, '#00ff00');
           }
           if (m.energy <= 0) { game.monsters.splice(i, 1); }
         }
@@ -155,7 +175,11 @@
             }
             h.x = next.x; h.y = next.y;
             let target = game.grid[h.x][h.y] ? game.grid[h.x][h.y][0] : null;
-            if (target) { target.energy -= 20; game.map[h.x][h.y] = Math.max(0, game.map[h.x][h.y] - 0.2); }
+            if (target) { 
+              target.energy -= 20; 
+              game.map[h.x][h.y] = Math.max(0, game.map[h.x][h.y] - 0.2); 
+              for(let k=0; k<8; k++) addParticle(h.x, h.y, '#444444');
+            }
           }
           if (h.hp <= 0) game.heroes.splice(idx, 1);
         });
@@ -171,7 +195,7 @@
       for (let x = 0; x < COLS; x++) {
         for (let y = 0; y < ROWS; y++) {
           let d = Math.min(1, game.map[x][y] / 3);
-          ctx.fillStyle = `rgb(${d*100}, ${d*30}, 10)`;
+          ctx.fillStyle = `rgb(${d*20}, ${d*150}, ${d*50})`;
           ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
         }
       }
@@ -181,6 +205,13 @@
       });
       game.heroes.forEach(h => { ctx.fillStyle = '#fff'; ctx.fillRect(h.x * TILE + 5, h.y * TILE + 5, TILE - 10, TILE - 10); });
       
+      game.particles.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.fillRect(p.x, p.y, 4, 4);
+      });
+      ctx.globalAlpha = 1.0;
+
       const mx = Math.floor(mouseX / TILE), my = Math.floor(mouseY / TILE);
       if(mx>=0 && mx<COLS && my>=0 && my<ROWS) {
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
