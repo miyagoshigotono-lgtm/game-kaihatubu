@@ -17,23 +17,17 @@
     const COLS = 20, ROWS = 15;
     const HUD = 120;
     let TILE = 40;
-    let mouse = { x: 0, y: 0 };
 
     let game = {
       round: 1,
       digsLeft: 10,
       phase: 'dig',
-      map: [],
+      map: [], // 0:壁, 1:空間, 2:高栄養タイル, 3:分解中
       monsters: [],
       heroes: [],
-      particles: [],
       decals: [],
       message: '魔王よ、地面を掘り、魔物の揺りかごを作れ'
     };
-
-    function addParticle(x, y, type) {
-      game.particles.push({ x: x * TILE + TILE/2, y: y * TILE + TILE/2, type, life: 1.0 });
-    }
 
     function resize() {
       const availW = window.innerWidth;
@@ -48,7 +42,6 @@
       game.map = Array.from({ length: COLS }, () => Array(ROWS).fill(0));
       game.monsters = [];
       game.heroes = [];
-      game.particles = [];
       game.decals = [];
       game.phase = 'dig';
       game.digsLeft = 10 + (game.round - 1) * 2;
@@ -63,112 +56,113 @@
       const cy = Math.floor((e.clientY - rect.top) / TILE);
       if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy] !== 0) return;
       
-      const rand = Math.random();
-      game.map[cx][cy] = rand < 0.25 ? 2 : 1;
+      game.map[cx][cy] = 1;
       game.digsLeft--;
       
       if (Math.random() < 0.6) {
-        game.monsters.push({ x: cx, y: cy, hp: 5, lv: 1, hunger: 60, type: Math.random() > 0.3 ? 0 : 1, age: 0, isDiseased: false });
+        game.monsters.push({ x: cx, y: cy, hp: 10, lv: 1, hunger: 80, type: Math.random() > 0.3 ? 0 : 1, mutation: 0 });
       }
 
       if (game.digsLeft <= 0) {
         game.phase = 'battle';
         game.message = '勇者が侵攻を開始した！';
         for (let i = 0; i < 2 + game.round; i++) {
-          game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 10 + game.round * 5, t: 0 });
+          game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 20 + game.round * 5, t: 0 });
         }
       }
     }
 
     function update(dt) {
-      game.particles.forEach((p, i) => { p.life -= dt * 2; if (p.life <= 0) game.particles.splice(i, 1); });
-      game.decals.forEach((d, i) => { d.life -= dt; if (d.life <= 0) game.decals.splice(i, 1); });
+      // 分解ロジック更新
+      game.decals.forEach((d, i) => {
+        d.timer -= dt;
+        if (d.timer <= 0) {
+          game.map[d.x][d.y] = 2; // 分解完了、高栄養タイル化
+          game.decals.splice(i, 1);
+        }
+      });
 
       if (game.phase !== 'battle') return;
 
       for (let i = game.monsters.length - 1; i >= 0; i--) {
         let m = game.monsters[i];
-        m.age++;
+        let tileType = game.map[m.x][m.y];
         
-        let hungerDrain = 5;
-        if (game.map[m.x][m.y] === 2) {
-            m.hunger += 15;
-        } else if (game.map[m.x][m.y] === 3) {
-            m.hunger += 40;
-            if (Math.random() < 0.05) m.isDiseased = true;
-        }
-        m.hunger -= (hungerDrain + (m.isDiseased ? 5 : 0)) * dt;
+        // 代謝と栄養による生存曲線
+        let drain = (tileType === 2) ? 2 : 8;
+        if (tileType === 2) m.mutation += 0.5 * dt;
+        m.hunger -= drain * dt;
 
-        if (Math.random() < 0.1) {
-          const nx = m.x + Math.floor(Math.random() * 3) - 1;
-          const ny = m.y + Math.floor(Math.random() * 3) - 1;
-          if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny] >= 1) {
-            m.x = nx; m.y = ny;
-          }
-        }
-
+        // 捕食ロジック
         if (m.type === 1) {
           game.monsters.forEach(target => {
             if (target.type === 0 && target.x === m.x && target.y === m.y) {
-              m.hunger += 60; target.hp = 0;
-              addParticle(m.x, m.y, 'blood');
-              game.decals.push({ x: m.x, y: m.y, life: 5 });
-              game.map[m.x][m.y] = 3;
+              m.hunger += 50; target.hp = 0;
             }
           });
         }
 
-        if (m.hunger >= 100) {
-          m.hunger -= 50;
-          game.monsters.push({ x: m.x, y: m.y, hp: 5, lv: 1, hunger: 50, type: m.type, age: 0, isDiseased: false });
+        // 繁殖と進化
+        if (m.hunger >= 150) {
+          m.hunger -= 70;
+          let isMutant = m.mutation > 10;
+          game.monsters.push({ 
+            x: m.x, y: m.y, hp: 15 + (isMutant ? 10 : 0), 
+            lv: isMutant ? 2 : 1, hunger: 50, type: m.type, mutation: 0 
+          });
         }
 
-        if (m.hunger <= 0 || m.hp <= 0 || (m.isDiseased && m.age > 500)) game.monsters.splice(i, 1);
+        // 移動
+        if (Math.random() < 0.05) {
+          m.x = Math.max(0, Math.min(COLS - 1, m.x + Math.floor(Math.random()*3)-1));
+          m.y = Math.max(0, Math.min(ROWS - 1, m.y + Math.floor(Math.random()*3)-1));
+        }
+
+        if (m.hunger <= 0 || m.hp <= 0) {
+          game.map[m.x][m.y] = 3; // 分解開始
+          game.decals.push({ x: m.x, y: m.y, timer: 3 });
+          game.monsters.splice(i, 1);
+        }
       }
 
       game.heroes.forEach((h, idx) => {
         h.t += dt;
-        if (h.t > 0.8) {
+        if (h.t > 0.5) {
           h.t = 0;
-          let target = game.monsters.length > 0 ? game.monsters.reduce((prev, curr) => 
-            (Math.abs(curr.x - h.x) + Math.abs(curr.y - h.y)) < (Math.abs(prev.x - h.x) + Math.abs(prev.y - h.y)) ? curr : prev
-          ) : null;
+          let target = game.monsters.length > 0 ? game.monsters[0] : null;
           if (target) {
-            if (target.x !== h.x) h.x += (target.x > h.x ? 1 : -1);
-            else if (target.y !== h.y) h.y += (target.y > h.y ? 1 : -1);
-            if (h.x === target.x && h.y === target.y) target.hp -= 2;
+            if (h.x !== target.x) h.x += (target.x > h.x ? 1 : -1);
+            else if (h.y !== target.y) h.y += (target.y > h.y ? 1 : -1);
+            if (h.x === target.x && h.y === target.y) target.hp -= 5;
           }
         }
         if (h.hp <= 0) game.heroes.splice(idx, 1);
       });
 
-      if (game.monsters.length === 0) { game.phase = 'over'; game.message = '魔物が全滅した... 敗北。クリックで再挑戦'; }
-      else if (game.heroes.length === 0) { game.round++; game.phase = 'dig'; game.digsLeft = 10 + (game.round - 1) * 2; game.message = '防衛成功。ラウンド ' + game.round + ' へ'; }
+      if (game.monsters.length === 0 && game.phase === 'battle') { game.phase = 'over'; game.message = '敗北... クリックで再挑戦'; }
+      else if (game.heroes.length === 0 && game.phase === 'battle') { game.round++; game.phase = 'dig'; game.digsLeft = 10 + (game.round - 1) * 2; game.message = '防衛成功！'; }
     }
 
     function render() {
       ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      let nutrients = 0;
       for (let x = 0; x < COLS; x++) {
         for (let y = 0; y < ROWS; y++) {
-          let color = '#1a1a2e';
-          if (game.map[x][y] === 2) { color = '#4a3a2e'; nutrients++; }
-          else if (game.map[x][y] === 3) { color = '#3a1a1a'; nutrients += 2; }
+          let color = '#111';
+          if (game.map[x][y] === 2) color = '#4a2';
+          if (game.map[x][y] === 3) color = '#a22';
           ctx.fillStyle = color;
           ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
         }
       }
       game.monsters.forEach(m => {
-        ctx.fillStyle = m.isDiseased ? '#888' : (m.type === 0 ? '#44ff44' : '#ff4444');
+        ctx.fillStyle = m.lv > 1 ? '#ff0' : '#4af';
         ctx.fillRect(m.x * TILE + 5, m.y * TILE + 5, TILE - 10, TILE - 10);
       });
-      game.heroes.forEach(h => { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(h.x * TILE + TILE/2, h.y * TILE + TILE/2, TILE/3, 0, Math.PI*2); ctx.fill(); });
+      game.heroes.forEach(h => { ctx.fillStyle = '#f00'; ctx.fillRect(h.x * TILE + 10, h.y * TILE + 10, TILE - 20, TILE - 20); });
       
-      ctx.fillStyle = '#333'; ctx.fillRect(20, ROWS * TILE + 20, 200, 10);
-      ctx.fillStyle = '#0f0'; ctx.fillRect(20, ROWS * TILE + 20, Math.min(200, nutrients * 5), 10);
-      ctx.fillStyle = '#fff'; ctx.fillText(`栄養密度`, 20, ROWS * TILE + 45);
-      ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 70);
-      ctx.fillText(game.message, 20, ROWS * TILE + 100);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 40);
+      ctx.fillText(game.message, 20, ROWS * TILE + 70);
     }
 
     let last = 0;
