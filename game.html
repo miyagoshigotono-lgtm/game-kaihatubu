@@ -106,14 +106,15 @@
       if (game.phase === 'battle') {
         const predators = game.monsters.filter(m => m.type === 1);
         const preys = game.monsters.filter(m => m.type === 0);
-        const preyRatio = preys.length > 0 ? predators.length / preys.length : 1.0;
+        const preyRatio = preys.length > 0 ? predators.length / preys.length : 5.0;
+        const K = 2.0;
 
         for (let i = game.monsters.length - 1; i >= 0; i--) {
           let m = game.monsters[i];
           
           let metabolism = (Math.pow(m.genes.speed, 2) * m.genes.size * m.genes.metabolism);
           if (m.type === 1) {
-            metabolism *= (1.0 + preyRatio); 
+            metabolism *= (1.0 + preyRatio * K); 
           }
           
           m.energy -= metabolism * dt * 5;
@@ -157,7 +158,7 @@
         });
 
         if (game.monsters.length === 0 && game.heroes.length > 0) { game.phase = 'over'; game.message = '魔物が全滅した... クリックで再挑戦'; }
-        else if (game.heroes.length === 0) { game.round++; game.phase = 'dig'; game.digsLeft = 10 + (game.round - 1) * 2; game.message = '防衛成功！次の階層へ'; }
+        else if (game.heroes.length === 0) { game.round++; game.phase = 'dig'; game.digsLeft = 10 + (game.round - 1) * 2; game.message = '防衛成功！次���階層へ'; }
       }
       updateGrid();
     }
@@ -174,10 +175,9 @@
       game.monsters.forEach(m => {
         ctx.fillStyle = m.type === 1 ? '#ff4444' : '#44aaff';
         ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/4, 0, Math.PI*2); ctx.fill();
-        if (m.type === 1 && m.energy < 20) {
-          ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-          ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/2, 0, Math.PI*2); ctx.stroke();
+        if (m.type === 1 && m.energy < 15) {
+          ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+          ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/2, 0, Math.PI*2); ctx.fill();
         }
       });
       game.heroes.forEach(h => { ctx.fillStyle = '#fff'; ctx.fillRect(h.x * TILE + 5, h.y * TILE + 5, TILE - 10, TILE - 10); });
@@ -186,7 +186,7 @@
       ctx.font = '14px monospace';
       ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 30);
       ctx.fillText(game.message, 20, ROWS * TILE + 60);
-      ctx.fillText("生態系: 青(被食者) 赤(捕食者) | 赤枠は飢餓状態", 20, ROWS * TILE + 90);
+      ctx.fillText("生態系: 青(被��者) 赤(捕食者) | 赤いオーラは飢餓(代謝増大)", 20, ROWS * TILE + 90);
     }
 
     let last = 0;
