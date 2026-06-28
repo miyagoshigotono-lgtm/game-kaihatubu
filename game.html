@@ -36,9 +36,9 @@
 
     function getAttractiveness(x, y) {
       const f = game.map[x][y].filter;
-      if (f === FILTERS.NURSERY) return 2.0;
-      if (f === FILTERS.SANCTUARY) return 1.5;
-      if (f === FILTERS.RESOURCE) return 1.8;
+      if (f === FILTERS.NURSERY) return 3.0;
+      if (f === FILTERS.SANCTUARY) return 2.0;
+      if (f === FILTERS.RESOURCE) return 2.5;
       return 1.0;
     }
 
@@ -70,7 +70,7 @@
         reproThreshold: 80 + Math.random() * 40,
         size: 0.8 + Math.random() * 0.4
       };
-      return { id: ++monsterCounter, parentId, generation, x, y, hp: 10, type, energy: 50, lastMoveTime: 0, genes };
+      return { id: ++monsterCounter, parentId, generation, x, y, hp: 10, type, energy: 50, lastMoveTime: 0, genes, isSettled: false };
     }
 
     function updateGrid() {
@@ -116,7 +116,6 @@
       
       if (Math.random() < 0.8) {
         game.monsters.push(createMonster(cx, cy, Math.random() > 0.4 ? 0 : 1));
-        updateGrid();
       }
 
       if (game.digsLeft <= 0) {
@@ -151,12 +150,11 @@
         const predators = game.monsters.filter(m => m.type === 1);
         const preys = game.monsters.filter(m => m.type === 0);
         const preyRatio = preys.length > 0 ? predators.length / preys.length : 5.0;
-        const K = 2.0;
 
         for (let i = game.monsters.length - 1; i >= 0; i--) {
           let m = game.monsters[i];
           let metabolism = (Math.pow(m.genes.speed, 2) * m.genes.size * m.genes.metabolism);
-          if (m.type === 1) metabolism *= (1.0 + preyRatio * K); 
+          if (m.type === 1) metabolism *= (1.0 + preyRatio * 2.0); 
           m.energy -= metabolism * dt * 5;
           m.lastMoveTime += dt;
 
@@ -169,21 +167,21 @@
             }
           }
 
-          let attr = getAttractiveness(m.x, m.y);
-          let moveThreshold = (1.5 - m.genes.speed) * (1.0 + attr * 0.5);
-
+          let moveThreshold = (1.5 - m.genes.speed) * 0.5;
           if (m.lastMoveTime > moveThreshold) {
             let bestScore = -1, bestPos = {x: m.x, y: m.y};
+            let candidates = [];
             for(let dx=-1; dx<=1; dx++) {
               for(let dy=-1; dy<=1; dy++) {
                 let nx = m.x + dx, ny = m.y + dy;
                 if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny].value > 0) {
-                  let score = getAttractiveness(nx, ny) * (1.0 + (m.energy < 30 ? 1.0 : 0));
+                  let score = getAttractiveness(nx, ny);
                   if(score > bestScore) { bestScore = score; bestPos = {x: nx, y: ny}; }
                 }
               }
             }
-            m.x = bestPos.x; m.y = bestPos.y;
+            if (Math.random() < 0.9) { m.x = bestPos.x; m.y = bestPos.y; }
+            m.isSettled = (bestScore > 1.2);
             m.lastMoveTime = 0;
           }
 
@@ -212,11 +210,7 @@
             }
             h.x = next.x; h.y = next.y;
             let target = game.grid[h.x][h.y] ? game.grid[h.x][h.y][0] : null;
-            if (target) { 
-              target.energy -= 20; 
-              game.map[h.x][h.y].value = Math.max(0, game.map[h.x][h.y].value - 0.2); 
-              for(let k=0; k<8; k++) addParticle(h.x, h.y, '#444444');
-            }
+            if (target) { target.energy -= 20; game.map[h.x][h.y].value -= 0.1; }
           }
           if (h.hp <= 0) game.heroes.splice(idx, 1);
         });
@@ -236,14 +230,18 @@
           ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
           
           if(game.map[x][y].filter) {
-            ctx.fillStyle = game.map[x][y].filter === FILTERS.NURSERY ? 'rgba(0,255,0,0.3)' : 
-                            game.map[x][y].filter === FILTERS.SANCTUARY ? 'rgba(255,255,0,0.3)' : 'rgba(0,255,255,0.3)';
+            ctx.fillStyle = game.map[x][y].filter === FILTERS.NURSERY ? 'rgba(0,255,0,0.2)' : 
+                            game.map[x][y].filter === FILTERS.SANCTUARY ? 'rgba(255,255,0,0.2)' : 'rgba(0,255,255,0.2)';
             ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
           }
         }
       }
       
       game.monsters.forEach(m => {
+        if(m.isSettled) {
+          ctx.fillStyle = game.map[m.x][m.y].filter === FILTERS.NURSERY ? 'rgba(0,255,0,0.5)' : 'rgba(255,255,255,0.3)';
+          ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/2, 0, Math.PI*2); ctx.fill();
+        }
         ctx.fillStyle = m.type === 1 ? '#ff4444' : '#44aaff';
         ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/4, 0, Math.PI*2); ctx.fill();
       });
