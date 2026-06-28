@@ -17,6 +17,7 @@
     const COLS = 20, ROWS = 15;
     const HUD = 120;
     let TILE = 40;
+    let mouseX = 0, mouseY = 0;
 
     let game = {
       round: 1,
@@ -111,54 +112,56 @@
 
         for (let i = game.monsters.length - 1; i >= 0; i--) {
           let m = game.monsters[i];
-          
           let metabolism = (Math.pow(m.genes.speed, 2) * m.genes.size * m.genes.metabolism);
-          if (m.type === 1) {
-            metabolism *= (1.0 + preyRatio * K); 
-          }
-          
+          if (m.type === 1) metabolism *= (1.0 + preyRatio * K); 
           m.energy -= metabolism * dt * 5;
           m.lastMoveTime += dt;
 
           if (m.type === 1) {
-            let preyIndex = game.grid[m.x][m.y].findIndex(other => other.type === 0);
-            if (preyIndex !== -1) {
-              let prey = game.grid[m.x][m.y][preyIndex];
-              m.energy += prey.energy;
-              prey.energy = -1; 
+            let preyIdx = game.grid[m.x][m.y].findIndex(o => o.type === 0);
+            if (preyIdx !== -1) {
+              m.energy += game.grid[m.x][m.y][preyIdx].energy;
+              game.grid[m.x][m.y][preyIdx].energy = -1; 
             }
           }
 
           if (m.lastMoveTime > (1.5 - m.genes.speed)) {
             let nx = Math.max(0, Math.min(COLS - 1, m.x + Math.floor(Math.random()*3)-1));
             let ny = Math.max(0, Math.min(ROWS - 1, m.y + Math.floor(Math.random()*3)-1));
-            m.x = nx; m.y = ny; m.lastMoveTime = 0;
+            if (game.map[nx][ny] > 0) { m.x = nx; m.y = ny; }
+            m.lastMoveTime = 0;
           }
 
           if (m.energy > m.genes.reproThreshold && game.map[m.x][m.y] > 0.2) {
             m.energy /= 2;
             game.monsters.push(createMonster(m.x, m.y, m.type, m.genes, game.map[m.x][m.y]));
           }
-
-          if (m.energy <= 0) {
-            game.map[m.x][m.y] += 0.5;
-            game.monsters.splice(i, 1);
-          }
+          if (m.energy <= 0) { game.monsters.splice(i, 1); }
         }
 
         game.heroes.forEach((h, idx) => {
           h.t += dt;
-          if (h.t > 1.5) {
+          if (h.t > 1.0) {
             h.t = 0;
+            let bestScore = -1, next = {x: h.x, y: h.y};
+            for(let dx=-1; dx<=1; dx++) {
+              for(let dy=-1; dy<=1; dy++) {
+                let nx = h.x + dx, ny = h.y + dy;
+                if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny] > 0) {
+                  let score = game.map[nx][ny] + (game.grid[nx][ny].length * 2);
+                  if(score > bestScore) { bestScore = score; next = {x: nx, y: ny}; }
+                }
+              }
+            }
+            h.x = next.x; h.y = next.y;
             let target = game.grid[h.x][h.y] ? game.grid[h.x][h.y][0] : null;
-            if (target) target.energy -= 30;
-            else if (h.x < COLS - 1) h.x++;
+            if (target) { target.energy -= 20; game.map[h.x][h.y] = Math.max(0, game.map[h.x][h.y] - 0.2); }
           }
           if (h.hp <= 0) game.heroes.splice(idx, 1);
         });
 
         if (game.monsters.length === 0 && game.heroes.length > 0) { game.phase = 'over'; game.message = '魔物が全滅した... クリックで再挑戦'; }
-        else if (game.heroes.length === 0) { game.round++; game.phase = 'dig'; game.digsLeft = 10 + (game.round - 1) * 2; game.message = '防衛成功！次���階層へ'; }
+        else if (game.heroes.length === 0) { game.round++; game.phase = 'dig'; game.digsLeft = 10 + (game.round - 1) * 2; game.message = '防衛成功！次の階層へ'; }
       }
       updateGrid();
     }
@@ -175,24 +178,28 @@
       game.monsters.forEach(m => {
         ctx.fillStyle = m.type === 1 ? '#ff4444' : '#44aaff';
         ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/4, 0, Math.PI*2); ctx.fill();
-        if (m.type === 1 && m.energy < 15) {
-          ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-          ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/2, 0, Math.PI*2); ctx.fill();
-        }
       });
       game.heroes.forEach(h => { ctx.fillStyle = '#fff'; ctx.fillRect(h.x * TILE + 5, h.y * TILE + 5, TILE - 10, TILE - 10); });
+      
+      const mx = Math.floor(mouseX / TILE), my = Math.floor(mouseY / TILE);
+      if(mx>=0 && mx<COLS && my>=0 && my<ROWS) {
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(mx*TILE, my*TILE, TILE, TILE);
+        ctx.fillStyle = '#fff';
+        ctx.fillText('栄養: ' + game.map[mx][my].toFixed(1), mouseX + 10, mouseY - 10);
+      }
       
       ctx.fillStyle = '#fff';
       ctx.font = '14px monospace';
       ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 30);
       ctx.fillText(game.message, 20, ROWS * TILE + 60);
-      ctx.fillText("生態系: 青(被��者) 赤(捕食者) | 赤いオーラは飢餓(代謝増大)", 20, ROWS * TILE + 90);
     }
 
     let last = 0;
     function loop(ts) { update((ts - last) / 1000); render(); last = ts; requestAnimationFrame(loop); }
     window.addEventListener('resize', resize);
     canvas.addEventListener('click', onDig);
+    canvas.addEventListener('mousemove', e => { const r = canvas.getBoundingClientRect(); mouseX = e.clientX - r.left; mouseY = e.clientY - r.top; });
     init(); requestAnimationFrame(loop);
   </script>
 </body>
