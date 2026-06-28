@@ -106,8 +106,9 @@ function readFileSafe(p, fb) { try { return fs.readFileSync(p, 'utf8'); } catch 
 function readJsonSafe(p, fb) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fb; } }
 function nowStamp() {
   const d = new Date();
+  const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
   const p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return `${jst.getUTCFullYear()}-${p(jst.getUTCMonth() + 1)}-${p(jst.getUTCDate())} ${p(jst.getUTCHours())}:${p(jst.getUTCMinutes())}`;
 }
 function extractJson(text) {
   let s = String(text == null ? '' : text).trim().replace(/```json/gi, '').replace(/```/g, '').trim();

@@ -329,6 +329,18 @@
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    // UTC文字列 "YYYY-MM-DD HH:mm" → 日本時間表示
+    function toJST(ts) {
+      if (!ts) return '';
+      const d = new Date(String(ts).replace(' ', 'T') + ':00Z');
+      if (isNaN(d.getTime())) return ts;
+      return d.toLocaleString('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
     // ===== 意図の表示 =====
     function renderIntent(data) {
       const el = document.getElementById('intentText');
@@ -367,7 +379,7 @@
           ? `<span class="log-section-tag">${esc(l.target_section)}</span>`
           : '';
         const taskText = esc(l.task || l.priority || l.changes || '（詳細なし）');
-        const ts = esc(l.timestamp || '');
+        const ts = esc(toJST(l.timestamp));
 
         const bodyLines = [];
         if (l.task)    bodyLines.push(`タスク: ${l.task}`);
@@ -396,7 +408,7 @@
       if (!Array.isArray(logs) || logs.length === 0) { el.textContent = ''; return; }
       const last = logs[logs.length - 1];
       const successLogs = logs.filter(l => l.result === 'success');
-      el.textContent = `最終更新: ${last.timestamp || '—'} ／ 成功: ${successLogs.length}件 ／ 合計: ${logs.length}件`;
+      el.textContent = `最終更新: ${toJST(last.timestamp) || '—'} (JST) ／ 成功: ${successLogs.length}件 ／ 合計: ${logs.length}件`;
     }
 
     // ===== 初期ロード =====
