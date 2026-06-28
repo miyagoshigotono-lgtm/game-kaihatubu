@@ -17,7 +17,6 @@
     const COLS = 20, ROWS = 15;
     const HUD = 120;
     let TILE = 40;
-    let mouseX = 0, mouseY = 0;
     let monsterCounter = 0;
 
     const FILTERS = { NONE: null, NURSERY: 'NURSERY', SANCTUARY: 'SANCTUARY', RESOURCE: 'RESOURCE' };
@@ -34,6 +33,14 @@
       particles: [],
       message: '魔王よ、地面を掘り、魔物の揺りかごを作れ (右クリックで環境フィルター設置)'
     };
+
+    function getAttractiveness(x, y) {
+      const f = game.map[x][y].filter;
+      if (f === FILTERS.NURSERY) return 2.0;
+      if (f === FILTERS.SANCTUARY) return 1.5;
+      if (f === FILTERS.RESOURCE) return 1.8;
+      return 1.0;
+    }
 
     function addParticle(x, y, color, life = 1.0) {
       game.particles.push({
@@ -162,16 +169,25 @@
             }
           }
 
-          if (m.lastMoveTime > (1.5 - m.genes.speed)) {
-            let nx = Math.max(0, Math.min(COLS - 1, m.x + Math.floor(Math.random()*3)-1));
-            let ny = Math.max(0, Math.min(ROWS - 1, m.y + Math.floor(Math.random()*3)-1));
-            if (game.map[nx][ny].value > 0) { 
-                if (game.map[nx][ny].filter === FILTERS.NURSERY && Math.random() < 0.3) {} else { m.x = nx; m.y = ny; }
+          let attr = getAttractiveness(m.x, m.y);
+          let moveThreshold = (1.5 - m.genes.speed) * (1.0 + attr * 0.5);
+
+          if (m.lastMoveTime > moveThreshold) {
+            let bestScore = -1, bestPos = {x: m.x, y: m.y};
+            for(let dx=-1; dx<=1; dx++) {
+              for(let dy=-1; dy<=1; dy++) {
+                let nx = m.x + dx, ny = m.y + dy;
+                if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny].value > 0) {
+                  let score = getAttractiveness(nx, ny) * (1.0 + (m.energy < 30 ? 1.0 : 0));
+                  if(score > bestScore) { bestScore = score; bestPos = {x: nx, y: ny}; }
+                }
+              }
             }
+            m.x = bestPos.x; m.y = bestPos.y;
             m.lastMoveTime = 0;
           }
 
-          let reproChance = (game.map[m.x][m.y].filter === FILTERS.NURSERY) ? 0.02 : 0.005;
+          let reproChance = (game.map[m.x][m.y].filter === FILTERS.NURSERY) ? 0.05 : 0.005;
           if (m.energy > m.genes.reproThreshold && game.map[m.x][m.y].value > 0.2 && Math.random() < reproChance) {
             m.energy /= 2;
             game.monsters.push(createMonster(m.x, m.y, m.type, m.genes, m.generation + 1, m.id, game.map[m.x][m.y].value));
