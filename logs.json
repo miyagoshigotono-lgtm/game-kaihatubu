@@ -378,5 +378,15 @@
     "task": "魔王の移動に合わせて隣接するwallを掘削し、groundへ変換するdig(x, y)関数を実装し、それをupdate()またはキーボードイベントから呼び出す。掘削時にmap[y][x].nutrientに応じた確率で魔物を生成し、game.monsters配列に追加するロジックを統合する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-29 21:54",
+    "cycle_type": "morning",
+    "cycle_number": 7,
+    "result": "success",
+    "target_section": "ECOSYSTEM",
+    "task": "updateGrid()関数を完成させ、各グリッドセル内の魔物リストを管理するロジックを実装する。具体的には、mapの各座標(x, y)に対して、現在位置がその座標と一致する魔物をフィルタリングして格納し、さらに捕食判定を行うcheckPredation(cellMonsters)関数を呼び出す仕組みを構築する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

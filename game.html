@@ -145,13 +145,40 @@ function createMonster(x, y, type, parentGenes = null, generation = 1, parentId 
   };
 }
 
-function updateGrid() {
-  game.grid = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => []));
-  game.monsters.forEach(m => {
-    if (m.x >= 0 && m.x < COLS && m.y >= 0 && m.y < ROWS) {
-      game.grid[Math.floor(m.x)][Math.floor(m.y)].push(m);
+function checkPredation(cellMonsters) {
+  const predators = cellMonsters.filter(m => m.type === 1);
+  const preys = cellMonsters.filter(m => m.type === 0);
+
+  predators.forEach(predator => {
+    if (preys.length > 0 && predator.energy < 100) {
+      const target = preys[Math.floor(Math.random() * preys.length)];
+      target.hp -= 20 * predator.genes.size;
+      predator.energy += 30;
+      if (target.hp <= 0) {
+        game.monsters = game.monsters.filter(m => m.id !== target.id);
+      }
     }
   });
+}
+
+function updateGrid() {
+  game.grid = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => []));
+  
+  game.monsters.forEach(m => {
+    const gx = Math.floor(m.x);
+    const gy = Math.floor(m.y);
+    if (gx >= 0 && gx < COLS && gy >= 0 && gy < ROWS) {
+      game.grid[gx][gy].push(m);
+    }
+  });
+
+  for (let x = 0; x < COLS; x++) {
+    for (let y = 0; y < ROWS; y++) {
+      if (game.grid[x][y].length > 1) {
+        checkPredation(game.grid[x][y]);
+      }
+    }
+  }
 }
 
 function resize() {
