@@ -448,5 +448,15 @@
     "task": "render()関数を拡張し、魔王の現在位置（playerX, playerY）を視覚的に強調する専用の描画ロジックを追加する。具体的には、魔王の座標に半透明の青いオーラ（円形パーティクル）を表示し、さらに現在地から隣接する掘削可能な壁に対して、マウスホバーやキー入力操作を促すための『掘削ガイド（黄色い枠線）』をオーバーレイ表示する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-30 02:58",
+    "cycle_type": "lunch",
+    "cycle_number": 35,
+    "result": "success",
+    "target_section": "INIT_INPUT",
+    "task": "キーボード入力（WASD）を「移動」と「掘削」に分離する。具体的には、キー入力時に隣接マスが壁なら掘削アクション（dig関数実行）、空き地なら移動アクション（playerX/Y更新）を行うロジックを実装し、掘削時にgame.digsLeftを減算して魔物生成トリガーを引く処理を完成させる。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

@@ -230,9 +230,13 @@ function init() {
   game.phase = 'dig';
   game.digsLeft = 10 + (game.round - 1) * 2;
   game.interferencePoints = 5 + game.round;
+  
+  // 魔王の初期位置を壁から空き地に変更（スタート地点を確保）
   playerX = Math.floor(COLS / 2);
   playerY = 0;
-  game.message = `ラウンド ${game.round}：WASD/矢印キーで移動・掘削。残り:${game.digsLeft}`;
+  game.map[playerX][playerY].type = 'ground';
+  
+  game.message = `ラウンド ${game.round}：WASD/矢印キーで移動・隣接壁を掘削。残り掘削回数:${game.digsLeft}`;
   updateGrid();
 }
 
@@ -243,7 +247,7 @@ function dig(x, y) {
   game.map[x][y].type = 'ground';
   game.digsLeft--;
 
-  // 魔物自動生成
+  // 魔物自動生成ロジック
   const monsterTypes = ['slime', 'bat', 'skeleton'];
   const type = monsterTypes[Math.floor(Math.random() * monsterTypes.length)];
   game.monsters.push(createMonster(x, y, type));
@@ -281,8 +285,10 @@ window.addEventListener('keydown', (e) => {
 
   if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
     if (game.map[nx][ny].type === 'wall') {
+      // 隣接マスが壁なら掘削を試みる
       dig(nx, ny);
     } else {
+      // 空き地なら移動する
       playerX = nx;
       playerY = ny;
     }
@@ -292,9 +298,11 @@ window.addEventListener('keydown', (e) => {
 
 function onFilter(e) {
   e.preventDefault();
+  if (game.phase !== 'dig') return;
   const rect = canvas.getBoundingClientRect();
   const cx = Math.floor((e.clientX - rect.left) / TILE);
   const cy = Math.floor((e.clientY - rect.top) / TILE);
+  
   if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy].type !== 'ground' || game.interferencePoints <= 0) return;
 
   const filters = [null, 'nursery', 'sanctuary', 'resource'];
