@@ -390,6 +390,8 @@ function render() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const VISIBILITY_RADIUS = 5;
+  const HUD_HEIGHT = 120;
+  const mapHeight = canvas.height - HUD_HEIGHT;
 
   function isVisible(x, y) {
     const dx = x - game.playerX;
@@ -397,12 +399,22 @@ function render() {
     return Math.sqrt(dx * dx + dy * dy) <= VISIBILITY_RADIUS;
   }
 
+  // 地形描画
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       const visible = isVisible(x, y);
       const d = Math.min(1, game.map[x][y].value / 3);
       ctx.fillStyle = visible ? `rgb(${d * 30}, ${d * 120 + 20}, ${d * 60})` : '#050505';
       ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
+
+      // 掘削可能マスのハイライト
+      const dx = Math.abs(x - game.playerX);
+      const dy = Math.abs(y - game.playerY);
+      if (game.digsLeft > 0 && ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) && game.map[x][y].value > 0) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4);
+      }
 
       if (visible && game.map[x][y].filter) {
         ctx.fillStyle = game.map[x][y].filter === FILTERS.NURSERY ? 'rgba(100,255,100,0.3)' : 'rgba(255,255,100,0.3)';
@@ -411,13 +423,13 @@ function render() {
     }
   }
 
+  // 魔物描画
   game.monsters.forEach(m => {
     if (!isVisible(m.x, m.y)) return;
     const px = m.x * TILE + TILE / 2;
     const py = m.y * TILE + TILE / 2;
     const size = (TILE / 2.5) * (m.genes.size || 1);
     ctx.fillStyle = `hsl(${m.appearance.colorBase}, 70%, 50%)`;
-
     ctx.beginPath();
     if (m.appearance.shapeType === 0) {
       ctx.arc(px, py, size, 0, Math.PI * 2);
@@ -430,52 +442,50 @@ function render() {
       }
     } else {
       for (let i = 0; i < 10; i++) {
-        const r = i % 2 === 0 ? size : size / 2;
+        const r = i % 2 === 0 ? size : size / 1.5;
         const angle = (i * Math.PI / 5) - Math.PI / 2;
         ctx.lineTo(px + Math.cos(angle) * r, py + Math.sin(angle) * r);
       }
     }
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.stroke();
   });
 
+  // 勇者描画
   game.heroes.forEach(h => {
     if (!isVisible(h.x, h.y)) return;
-    ctx.fillStyle = '#fff';
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = '#fff';
+    ctx.fillStyle = '#ff4444';
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ff0000';
     ctx.fillRect(h.x * TILE + 4, h.y * TILE + 4, TILE - 8, TILE - 8);
     ctx.shadowBlur = 0;
   });
 
-  game.particles.forEach(p => {
-    if (!isVisible(Math.floor(p.x / TILE), Math.floor(p.y / TILE))) return;
-    ctx.fillStyle = p.color;
-    ctx.globalAlpha = p.life;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-    ctx.fill();
-  });
-  ctx.globalAlpha = 1.0;
-
+  // フォグ描画
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       if (!isVisible(x, y)) {
-        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillStyle = 'rgba(0,0,0,0.9)';
         ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
       }
     }
   }
 
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
-  ctx.fillRect(0, ROWS * TILE, canvas.width, 100);
-  ctx.fillStyle = '#eee';
-  ctx.font = 'bold 14px Arial';
-  ctx.fillText(`ROUND: ${game.round} | DIGS: ${game.digsLeft} | MP: ${game.interferencePoints}`, 20, ROWS * TILE + 30);
-  ctx.font = '12px monospace';
-  ctx.fillText(game.message, 20, ROWS * TILE + 55);
+  // HUD描画
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0, mapHeight, canvas.width, HUD_HEIGHT);
+  ctx.strokeStyle = '#333';
+  ctx.strokeRect(0, mapHeight, canvas.width, HUD_HEIGHT);
+
+  ctx.fillStyle = '#00ffcc';
+  ctx.font = 'bold 18px "Courier New"';
+  ctx.fillText(`ROUND: ${game.round}`, 30, mapHeight + 40);
+  ctx.fillText(`DIGS LEFT: ${game.digsLeft}`, 200, mapHeight + 40);
+  ctx.fillText(`INTERFERENCE: ${game.interferencePoints}`, 400, mapHeight + 40);
+
+  ctx.fillStyle = '#cccccc';
+  ctx.font = '14px monospace';
+  ctx.fillText(`MESSAGE: ${game.message}`, 30, mapHeight + 80);
 }
 // ===END:RENDER===
 

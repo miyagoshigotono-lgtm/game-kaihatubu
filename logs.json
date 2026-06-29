@@ -398,5 +398,15 @@
     "task": "キーボードイベントリスナーを拡張し、魔王の移動（WASD）と連動して隣接マスを掘削する『dig(x, y)』関数を実装する。掘削時には『game.digsLeft』を消費し、掘削後の地面に『createMonster』を呼び出して魔物を配置するロジックを統合する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-29 22:02",
+    "cycle_type": "morning",
+    "cycle_number": 8,
+    "result": "success",
+    "target_section": "RENDER",
+    "task": "render()関数内に、HUD（画面下部）の描画処理を実装する。具体的には、現在のラウンド数、残り掘削回数(digsLeft)、干渉ポイント、およびプレイヤーへのメッセージを、画面下部120pxの領域にテキストとして描画する。また、掘削可能なマスを視覚的に強調するハイライト表示を追加する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

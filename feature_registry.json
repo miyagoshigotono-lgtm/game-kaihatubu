@@ -9,10 +9,10 @@
     "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
   },
   "recent_sections": [
-    "RENDER",
     "UPDATE",
     "ECOSYSTEM",
-    "INIT_INPUT"
+    "INIT_INPUT",
+    "RENDER"
   ],
   "implemented_features": [
     "[ECOSYSTEM] mutate()による遺伝子継承とcreateMonster()による魔物生成",
@@ -34,7 +34,8 @@
     "[RENDER] render()関数内に、魔王の現在位置（playerX, playerY）を中心とした視界範囲（VISIBILITY_RADIUS）のみを描画する「フォグ・オ…",
     "[UPDATE] 魔王の移動に合わせて隣接するwallを掘削し、groundへ変換するdig(x, y)関数を実装し、それをupdate()またはキーボードイベントから呼び出す。…",
     "[ECOSYSTEM] updateGrid()関数を完成させ、各グリッドセル内の魔物リストを管理するロジックを実装する。具体的には、mapの各座標(x, y)に対して、現在位置がその…",
-    "[INIT_INPUT] キーボードイベントリスナーを拡張し、魔王の移動（WASD）と連動して隣接マスを掘削する『dig(x, y)』関数を実装する。掘削時には『game.digsLef…"
+    "[INIT_INPUT] キーボードイベントリスナーを拡張し、魔王の移動（WASD）と連動して隣接マスを掘削する『dig(x, y)』関数を実装する。掘削時には『game.digsLef…",
+    "[RENDER] render()関数内に、HUD（画面下部）の描画処理を実装する。具体的には、現在のラウンド数、残り掘削回数(digsLeft)、干渉ポイント、およびプレイヤー…"
   ],
   "failed_approaches": [
     "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",
