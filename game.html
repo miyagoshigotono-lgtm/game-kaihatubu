@@ -260,38 +260,86 @@ function update(dt) {
 
 // ===SECTION:RENDER===
 function render() {
-  ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       let d = Math.min(1, game.map[x][y].value / 3);
-      ctx.fillStyle = `rgb(${d*20}, ${d*150}, ${d*50})`;
+      ctx.fillStyle = `rgb(${d * 30}, ${d * 120 + 20}, ${d * 60})`;
       ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
 
-      if(game.map[x][y].filter) {
-        ctx.fillStyle = game.map[x][y].filter === FILTERS.NURSERY ? 'rgba(0,255,0,0.2)' :
-                        game.map[x][y].filter === FILTERS.SANCTUARY ? 'rgba(255,255,0,0.2)' : 'rgba(0,255,255,0.2)';
+      if (game.map[x][y].filter) {
+        ctx.fillStyle = game.map[x][y].filter === FILTERS.NURSERY ? 'rgba(100,255,100,0.3)' : 'rgba(255,255,100,0.3)';
         ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
       }
     }
   }
 
   game.monsters.forEach(m => {
-    if(m.isSettled) {
-      ctx.fillStyle = game.map[m.x][m.y].filter === FILTERS.NURSERY ? 'rgba(0,255,0,0.5)' : 'rgba(255,255,255,0.3)';
-      ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/2, 0, Math.PI*2); ctx.fill();
+    const px = m.x * TILE + TILE / 2;
+    const py = m.y * TILE + TILE / 2;
+    const size = (TILE / 2.5) * (m.genes.size || 1);
+    ctx.fillStyle = `hsl(${m.appearance.colorBase}, 70%, 50%)`;
+
+    ctx.beginPath();
+    if (m.appearance.shapeType === 0) {
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+    } else if (m.appearance.shapeType === 1) {
+      for (let i = 0; i < 4; i++) {
+        const angle = (i * Math.PI / 2) + Math.PI / 4;
+        const x = px + Math.cos(angle) * size * 1.2;
+        const y = py + Math.sin(angle) * size * 1.2;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+    } else {
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? size : size / 2;
+        const angle = (i * Math.PI / 5) - Math.PI / 2;
+        ctx.lineTo(px + Math.cos(angle) * r, py + Math.sin(angle) * r);
+      }
     }
-    ctx.fillStyle = m.type === 1 ? '#ff4444' : '#44aaff';
-    ctx.beginPath(); ctx.arc(m.x * TILE + TILE/2, m.y * TILE + TILE/2, TILE/4, 0, Math.PI*2); ctx.fill();
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.stroke();
   });
 
-  game.heroes.forEach(h => { ctx.fillStyle = '#fff'; ctx.fillRect(h.x * TILE + 5, h.y * TILE + 5, TILE - 10, TILE - 10); });
-  game.particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 4, 4); });
+  game.heroes.forEach(h => {
+    ctx.fillStyle = '#fff';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#fff';
+    ctx.fillRect(h.x * TILE + 4, h.y * TILE + 4, TILE - 8, TILE - 8);
+    ctx.shadowBlur = 0;
+  });
+
+  function drawCombatEffect(x, y) {
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * TILE;
+      ctx.fillStyle = '#ff3300';
+      ctx.beginPath();
+      ctx.arc(x * TILE + TILE / 2 + Math.cos(angle) * dist, y * TILE + TILE / 2 + Math.sin(angle) * dist, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  game.particles.forEach(p => {
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
   ctx.globalAlpha = 1.0;
 
-  ctx.fillStyle = '#fff';
-  ctx.font = '14px monospace';
-  ctx.fillText(`Round: ${game.round} | 掘削: ${game.digsLeft} | 干渉: ${game.interferencePoints} | 魔物: ${game.monsters.length} | 勇者: ${game.heroes.length}`, 20, ROWS * TILE + 30);
-  ctx.fillText(game.message, 20, ROWS * TILE + 60);
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, ROWS * TILE, canvas.width, 100);
+  ctx.fillStyle = '#eee';
+  ctx.font = 'bold 14px Arial';
+  ctx.fillText(`ROUND: ${game.round} | DIGS: ${game.digsLeft} | MP: ${game.interferencePoints}`, 20, ROWS * TILE + 30);
+  ctx.font = '12px monospace';
+  ctx.fillText(game.message, 20, ROWS * TILE + 55);
 }
 // ===END:RENDER===
 

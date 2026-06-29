@@ -298,5 +298,15 @@
     "task": "createMonster関数に「外見遺伝子(appearanceCode)」を追加し、魔物のタイプごとに形状や色味を決定するロジックを実装する。具体的には、遺伝子から生成される数値に基づき、描画用のプロパティ（shapeType: 0=円, 1=多角形, 2=不定形、colorBase: 色相値）を個体に付与する処理を追加する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-29 12:50",
+    "cycle_type": "lunch",
+    "cycle_number": 28,
+    "result": "success",
+    "target_section": "RENDER",
+    "task": "render()関数内に、魔物の遺伝子情報（appearance.shapeType）に基づいた描画ロジックを実装する。具体的には、shapeType 0は円、1は多角形、2は星型として描画し、各魔物のサイズ(genes.size)と色相(appearance.colorBase)を反映させる。さらに、勇者と魔物の接触時にパーティクルを発生させるdrawCombatEffect()関数を追加し、バ…",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]
