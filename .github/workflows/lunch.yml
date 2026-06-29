@@ -24,18 +24,18 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run lunch agent (実装・QA・全文上書き)
+      - name: Run lunch agent (セクション選定→実装→QA)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: node scripts/lunch.js
 
-      - name: Commit game.html & logs.json
+      - name: Commit game.html & logs.json & feature_registry.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add game.html logs.json
+          git add game.html logs.json feature_registry.json
           if git diff --staged --quiet; then
-            echo "変更なし（QA不合格でgame.html非変更、またはログ差分なし）。"
+            echo "変更なし（QA不合格など）。コミットをスキップします。"
           else
             git commit -m "ランチ: game.html を更新 [skip ci]"
             git push
