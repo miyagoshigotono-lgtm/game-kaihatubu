@@ -329,22 +329,24 @@ ${rejectReason ? `【前回の却下理由（必ず修正すること）】\n${r
   if (!fullCheck.ok) return { pass: false, html: gameHtml, reason: '[全文検証NG]\n' + fullCheck.blocking.join('\n') };
 
   const qaPrompt = `
-あなたは品質・QAエージェントです。
+あなたは品質・QAエージェントです。game.html の ${targetSection} セクションを書き換えた「新しいコード」を審査します。
+（ファイル全体の構造・括弧の対応・セクションマーカーの保全は、別途プログラムが静的検証で確認済みです。あなたはこのセクションの内容のみを判定してください。全文を渡されているわけではありません。）
 
 ${GAME_SOUL}
 
-【更新後の game.html 全文】
-${truncate(newHtml, 7000)}
+【改善対象セクション】${targetSection}（${sectionDesc}）
+【今回のタスク】${specificTask}
 
-【改善したセクション】${targetSection}
-【タスク】${specificTask}
+【新しい ${targetSection} セクションのコード（これがコードの全文。途中省略や切り詰めはされていない）】
+${sectionCode}
 
-(A) 7つの魂が全て実装されているか。
-(B) <canvas>・init()・requestAnimationFrame が存在するか。
-(C) game.monsters・game.heroes・game.phase が存在するか。
-(D) JavaScriptに明らかな構文エラーがないか。
-(E) タスク「${truncate(specificTask, 80)}」が実際に実装されているか（同じコードの使い回しでないか）。
+判定基準:
+(A) タスクが実際にコードとして実装されているか。
+(B) このセクションが担う既存の役割・機能を壊していないか。
+(C) 明らかな構文エラーや、未定義の変数・関数への依存がないか。
+(D) 前のコードの単なる使い回しではなく、実際の改善になっているか。
 
+注意: コードの末尾が「}」などで自然に終わっていれば、それは完成形です。「途切れている」と誤判定しないこと。
 全て問題なければ「PASS」の4文字のみ出力してください。問題があれば原因を1〜3行で書いてください。`;
 
   const qa = await callGemini(qaPrompt, { temperature: 0.1, maxOutputTokens: 1024 });
