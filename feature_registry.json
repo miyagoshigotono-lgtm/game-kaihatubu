@@ -9,10 +9,10 @@
     "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
   },
   "recent_sections": [
-    "INIT_INPUT",
     "UPDATE",
     "STATE",
-    "CONFIG"
+    "CONFIG",
+    "INIT_INPUT"
   ],
   "implemented_features": [
     "[ECOSYSTEM] mutate()による遺伝子継承とcreateMonster()による魔物生成",
@@ -29,7 +29,8 @@
     "[INIT_INPUT] 魔王の操作ロジックの実装。キーボードイベントリスナーを追加し、WASDまたは十字キーで魔王（プレイヤー位置変数 playerX, playerY）を移動させ、S…",
     "[UPDATE] update(dt)関数を実装する。魔物が遺伝子のspeedに基づきグリッド内を移動するロジック、隣接する敵を捕食しエネルギーを消費・獲得する判定、energy…",
     "[STATE] gameオブジェクト内に魔王のステータス管理用プロパティを追加し、初期状態として playerX: 10, playerY: 0 を定義する。また、魔王の視界範…",
-    "[CONFIG] マップデータ構造を保持する2次元配列の初期化ロジックを追加し、game.mapを {type: 'wall', nutrient: 0, filter: nul…"
+    "[CONFIG] マップデータ構造を保持する2次元配列の初期化ロジックを追加し、game.mapを {type: 'wall', nutrient: 0, filter: nul…",
+    "[INIT_INPUT] キーボードイベントリスナーを実装し、十字キー（ArrowUp, ArrowDown, ArrowLeft, ArrowRight）入力時に魔王の座標(playe…"
   ],
   "failed_approaches": [
     "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",

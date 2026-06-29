@@ -348,5 +348,15 @@
     "task": "マップデータ構造を保持する2次元配列の初期化ロジックを追加し、game.mapを {type: 'wall', nutrient: 0, filter: null} のオブジェクトで初期化する関数 initMap() を定義する。また、魔王の初期位置(playerX, playerY)のタイルを 'ground' に変更し、視界範囲を表示するための定数設定を行う。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-29 18:36",
+    "cycle_type": "morning",
+    "cycle_number": 5,
+    "result": "success",
+    "target_section": "INIT_INPUT",
+    "task": "キーボードイベントリスナーを実装し、十字キー（ArrowUp, ArrowDown, ArrowLeft, ArrowRight）入力時に魔王の座標(playerX, playerY)を更新する。移動先が壁(type: 'wall')である場合、掘削回数(game.digsLeft)を消費して地形を'ground'に変更し、該当地点に魔物を生成するロジックを組み込む。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

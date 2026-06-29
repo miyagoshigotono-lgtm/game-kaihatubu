@@ -176,7 +176,7 @@ let playerY = 0;
 
 function init() {
   resize();
-  game.map = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => ({ value: 0.0, filter: null })));
+  game.map = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => ({ type: 'wall', filter: null })));
   game.monsters = [];
   game.heroes = [];
   game.particles = [];
@@ -185,27 +185,29 @@ function init() {
   game.interferencePoints = 5 + game.round;
   playerX = Math.floor(COLS / 2);
   playerY = 0;
-  game.message = 'ラウンド ' + game.round + '：WASDで移動、Spaceで掘削せよ';
+  game.message = `ラウンド ${game.round}：十字キーで移動、壁に接触して採掘せよ。残り:${game.digsLeft}`;
   updateGrid();
 }
 
 function onDig(x, y) {
   if (game.phase !== 'dig' || game.digsLeft <= 0) return;
-  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[x][y].value > 0) return;
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[x][y].type !== 'wall') return;
 
-  game.map[x][y].value = 3.0;
+  game.map[x][y].type = 'ground';
   game.digsLeft--;
 
-  if (Math.random() < 0.8) {
-    game.monsters.push(createMonster(x, y, Math.random() > 0.4 ? 0 : 1));
+  if (Math.random() < 0.7) {
+    game.monsters.push(createMonster(x, y, Math.random() > 0.5 ? 'slime' : 'bat'));
   }
 
   if (game.digsLeft <= 0) {
     game.phase = 'battle';
-    game.message = '勇者が侵攻を開始した！';
+    game.message = '掘削終了。勇者の侵攻が始まった！';
     for (let i = 0; i < 2 + game.round; i++) {
-      game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 30 + game.round * 10, t: 0 });
+      game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 30 + game.round * 10, target: null });
     }
+  } else {
+    game.message = `採掘中... 残り:${game.digsLeft}`;
   }
   updateGrid();
 }
@@ -215,21 +217,24 @@ window.addEventListener('keydown', (e) => {
   if (game.phase !== 'dig') return;
 
   let dx = 0, dy = 0;
-  switch (e.key.toLowerCase()) {
-    case 'w': case 'arrowup': dy = -1; break;
-    case 's': case 'arrowdown': dy = 1; break;
-    case 'a': case 'arrowleft': dx = -1; break;
-    case 'd': case 'arrowright': dx = 1; break;
-    case ' ': case 'enter':
-      onDig(playerX, playerY);
-      return;
+  switch (e.key) {
+    case 'ArrowUp': dy = -1; break;
+    case 'ArrowDown': dy = 1; break;
+    case 'ArrowLeft': dx = -1; break;
+    case 'ArrowRight': dx = 1; break;
+    default: return;
   }
 
   const nx = playerX + dx;
   const ny = playerY + dy;
+
   if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
-    playerX = nx;
-    playerY = ny;
+    if (game.map[nx][ny].type === 'wall') {
+      onDig(nx, ny);
+    } else {
+      playerX = nx;
+      playerY = ny;
+    }
   }
   updateGrid();
 });
@@ -239,9 +244,9 @@ function onFilter(e) {
   const rect = canvas.getBoundingClientRect();
   const cx = Math.floor((e.clientX - rect.left) / TILE);
   const cy = Math.floor((e.clientY - rect.top) / TILE);
-  if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy].value === 0 || game.interferencePoints <= 0) return;
+  if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy].type !== 'ground' || game.interferencePoints <= 0) return;
 
-  const filters = [FILTERS.NONE, FILTERS.NURSERY, FILTERS.SANCTUARY, FILTERS.RESOURCE];
+  const filters = [null, 'nursery', 'sanctuary', 'resource'];
   let currentIdx = filters.indexOf(game.map[cx][cy].filter);
   game.map[cx][cy].filter = filters[(currentIdx + 1) % filters.length];
   game.interferencePoints--;
