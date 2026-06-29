@@ -10,7 +10,8 @@
   },
   "recent_sections": [
     "RENDER",
-    "UPDATE"
+    "UPDATE",
+    "STATE"
   ],
   "implemented_features": [
     "[ECOSYSTEM] mutate()による遺伝子継承とcreateMonster()による魔物生成",
@@ -25,7 +26,8 @@
   ],
   "failed_approaches": [
     "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",
-    "[UPDATE] [QA却下] コードの末尾が「game.monsters…」で途切れており、構文エラー（Unexpected end o…"
+    "[UPDATE] [QA却下] コードの末尾が「game.monsters…」で途切れており、構文エラー（Unexpected end o…",
+    "[STATE] [QA却下] FAIL\nSECTION:ECOSYSTEM内のcreateMonster関数が、SECTION:STAT…"
   ],
   "current_cycle": 20,
   "notes": "v2: セクション分割による外科的改善方式に移行。1サイクルで1セクションのみを改善する。"
