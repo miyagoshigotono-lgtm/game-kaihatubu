@@ -134,56 +134,60 @@ function createMonster(x, y, type, parentGenes = null, generation = 1, parentId 
     speed: mutate(parentGenes.speed, nutrient),
     metabolism: mutate(parentGenes.metabolism, nutrient),
     reproThreshold: mutate(parentGenes.reproThreshold, nutrient),
-    size: mutate(parentGenes.size || 1.0, nutrient),
+    size: mutate(parentGenes.size, nutrient),
     appearance: {
       shapeType: parentGenes.appearance.shapeType,
       colorBase: Math.max(0, Math.min(360, parentGenes.appearance.colorBase + (Math.random() * 40 - 20)))
     }
   } : {
-    speed: 0.5 + Math.random() * 0.5,
-    metabolism: 0.8 + Math.random() * 0.4,
-    reproThreshold: 80 + Math.random() * 40,
-    size: 0.8 + Math.random() * 0.4,
+    speed: 0.5 + (nutrient * 0.2),
+    metabolism: 0.5 + (nutrient * 0.2),
+    reproThreshold: 80 + (nutrient * 20),
+    size: 0.5 + (nutrient * 0.5),
     appearance: {
-      shapeType: Math.floor(Math.random() * 3),
-      colorBase: type === 1 ? Math.random() * 60 : 180 + Math.random() * 120
+      shapeType: type === 1 ? Math.floor(Math.random() * 2) + 2 : Math.floor(Math.random() * 2),
+      colorBase: type === 1 ? 0 + Math.random() * 40 : 180 + Math.random() * 60
     }
   };
 
-  return { 
-    id: ++monsterCounter, 
-    parentId, 
-    generation, 
-    x, y, 
-    hp: 10 + (genes.size * 5), 
-    type, 
-    energy: 50, 
-    lastMoveTime: 0, 
-    genes, 
-    isSettled: false,
-    alpha: 0.8 + (genes.size * 0.2)
+  const monster = {
+    id: ++monsterCounter,
+    parentId,
+    generation,
+    x, y,
+    type,
+    hp: 20 * genes.size,
+    energy: 50 * genes.size,
+    genes,
+    lastMoveTime: 0,
+    isSettled: false
   };
+
+  game.monsters.push(monster);
+  return monster;
 }
 
 function checkPredation(cellMonsters) {
   const predators = cellMonsters.filter(m => m.type === 1);
   const preys = cellMonsters.filter(m => m.type === 0);
 
+  if (predators.length === 0 || preys.length === 0) return;
+
   predators.forEach(predator => {
-    if (preys.length > 0 && predator.energy < 100) {
-      const target = preys[Math.floor(Math.random() * preys.length)];
-      target.hp -= 20 * predator.genes.size;
-      predator.energy += 30;
-      if (target.hp <= 0) {
-        game.monsters = game.monsters.filter(m => m.id !== target.id);
-      }
+    const target = preys[Math.floor(Math.random() * preys.length)];
+    const damage = 5 * predator.genes.size;
+    target.hp -= damage;
+    predator.energy += damage * 0.5;
+
+    if (target.hp <= 0) {
+      game.monsters = game.monsters.filter(m => m.id !== target.id);
     }
   });
 }
 
 function updateGrid() {
   game.grid = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => []));
-  
+
   game.monsters.forEach(m => {
     const gx = Math.floor(m.x);
     const gy = Math.floor(m.y);
@@ -204,14 +208,14 @@ function updateGrid() {
 function resize() {
   const pixelRatio = window.devicePixelRatio || 1;
   const availW = window.innerWidth;
-  const availH = window.innerHeight - HUD;
+  const availH = window.innerHeight - 60;
   TILE = Math.floor(Math.min(availW / COLS, availH / ROWS));
-  
+
   canvas.width = COLS * TILE * pixelRatio;
-  canvas.height = (ROWS * TILE + HUD) * pixelRatio;
+  canvas.height = (ROWS * TILE) * pixelRatio;
   canvas.style.width = (COLS * TILE) + "px";
-  canvas.style.height = (ROWS * TILE + HUD) + "px";
-  
+  canvas.style.height = (ROWS * TILE) + "px";
+
   const ctx = canvas.getContext('2d');
   ctx.scale(pixelRatio, pixelRatio);
 }
