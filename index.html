@@ -228,7 +228,11 @@
         <button class="btn" onclick="reloadGame()">ゲームをリロード</button>
       </div>
       <div class="status-msg" id="statusMsg"></div>
-      <div class="hint">手動実行にはGitHub Personal Access Token（actions:write権限）が必要です。</div>
+      <div class="hint">
+        手動実行にはGitHub Personal Access Token（actions:write権限）が必要です。
+        <span id="tokenState"></span>
+        &nbsp;·&nbsp;<a href="#" onclick="resetToken(); return false;" style="color:#aaa;font-size:0.75rem;">トークンをリセット</a>
+      </div>
     </div>
 
     <!-- オーナーの意図 -->
@@ -268,11 +272,25 @@
       statusEl.textContent = msg;
       statusEl.className = 'status-msg' + (kind ? ' ' + kind : '');
     }
+    function updateTokenState() {
+      const el = document.getElementById('tokenState');
+      if (!el) return;
+      const t = localStorage.getItem('gh_pat');
+      el.textContent = t ? `（保存済: ${t.slice(0, 4)}…${t.slice(-4)}）` : '（未設定）';
+    }
+    function resetToken() {
+      localStorage.removeItem('gh_pat');
+      updateTokenState();
+      setStatus('トークンを削除しました。次回実行時に再入力してください。', '');
+    }
     function getOrAskToken() {
       let t = localStorage.getItem('gh_pat');
       if (!t) {
-        t = prompt('GitHub Personal Access Token を入力してください（actions:write 権限が必要）');
-        if (t) localStorage.setItem('gh_pat', t.trim());
+        t = prompt('GitHub Personal Access Token を入力してください\n（Settings → Developer settings → Personal access tokens → Fine-grained tokens\nまたは Classic tokens で actions:write / workflow 権限が必要）');
+        if (t) {
+          localStorage.setItem('gh_pat', t.trim());
+          updateTokenState();
+        }
       }
       return t ? t.trim() : '';
     }
@@ -299,7 +317,14 @@
           setStatus('実行を開始しました。数分後にこのページをリロードしてください。', 'ok');
         } else if (res.status === 401) {
           localStorage.removeItem('gh_pat');
-          setStatus('認証失敗（401）。トークンを削除しました。再度クリックして入力し直してください。', 'ng');
+          updateTokenState();
+          setStatus('認証失敗（401）— トークンが無効か期限切れです。「トークンをリセット」して再入力してください。', 'ng');
+        } else if (res.status === 403) {
+          setStatus('権限不足（403）— トークンに workflow または actions:write 権限があるか確認してください。', 'ng');
+        } else if (res.status === 422) {
+          let detail = '';
+          try { detail = (await res.json()).message || ''; } catch (e) {}
+          setStatus(`実行失敗（422）— ワークフローファイルが見つからないか workflow_dispatch トリガーが未設定の可能性。${detail ? ' 詳細: ' + detail : ''}`, 'ng');
         } else {
           let detail = '';
           try { detail = (await res.json()).message || ''; } catch (e) {}
@@ -413,6 +438,7 @@
 
     // ===== 初期ロード =====
     (async function init() {
+      updateTokenState();
       try {
         const intent = await fetchJson('user_intent.json');
         renderIntent(intent);
