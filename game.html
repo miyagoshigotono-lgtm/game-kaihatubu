@@ -255,102 +255,99 @@ function onFilter(e) {
 // ===END:INIT_INPUT===
 
 // ===SECTION:UPDATE===
+function dig(x, y) {
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[y][x].value === 0 || game.digsLeft <= 0) return;
+
+  game.map[y][x].value = 0;
+  game.digsLeft--;
+
+  const nutrient = game.map[y][x].nutrient;
+  if (Math.random() < nutrient * 0.2) {
+    const type = Math.random() < 0.3 ? 1 : 0; // 0:草食, 1:肉食
+    game.monsters.push(createMonster(x, y, type, {
+      speed: 0.2 + Math.random() * 0.5,
+      size: 0.1 + Math.random() * 0.4,
+      reproThreshold: 50 + Math.random() * 50
+    }, 0, Date.now() + Math.random()));
+  }
+}
+
 function update(dt) {
-  // パーティクル処理
   game.particles.forEach((p, i) => {
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
     if (p.life <= 0) game.particles.splice(i, 1);
   });
 
   if (game.phase === 'battle') {
-    // グリッドの同期（魔物の現在地を更新）
     updateGrid();
 
     for (let i = game.monsters.length - 1; i >= 0; i--) {
       let m = game.monsters[i];
-      
-      // 代謝計算：速度とサイズに基づきエネルギー消費
-      let metabolism = (m.genes.speed * 0.5 + m.genes.size * 0.2) * dt;
-      m.energy -= metabolism;
+      m.energy -= (m.genes.speed * 0.5 + m.genes.size * 0.2) * dt;
 
-      // 捕食判定（肉食個体が隣接マスまたは同マスの獲物を捕食）
       if (m.type === 1) {
-        let targets = game.grid[m.x][m.y].filter(o => o.type === 0);
+        let targets = game.grid[m.y][m.x].filter(o => o.type === 0);
         if (targets.length > 0) {
-          let prey = targets[0];
-          m.energy += prey.energy * 0.5;
-          prey.energy = -1; // 死亡フラグ
+          m.energy += targets[0].energy * 0.5;
+          targets[0].energy = -1;
           addParticle(m.x, m.y, '#ff0000');
         }
       }
 
-      // 移動ロジック：speedに応じた移動頻度
       m.lastMoveTime += dt;
       if (m.lastMoveTime > (1.1 - m.genes.speed)) {
-        let options = [];
-        for (let dx = -1; dx <= 1; dx++) {
-          for (let dy = -1; dy <= 1; dy++) {
-            let nx = m.x + dx, ny = m.y + dy;
-            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny].value > 0) {
-              options.push({x: nx, y: ny});
+        let neighbors = [];
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            let ny = m.y + dy, nx = m.x + dx;
+            if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && game.map[ny][nx].value === 0) {
+              neighbors.push({x: nx, y: ny});
             }
           }
         }
-        if (options.length > 0) {
-          let next = options[Math.floor(Math.random() * options.length)];
+        if (neighbors.length > 0) {
+          let next = neighbors[Math.floor(Math.random() * neighbors.length)];
           m.x = next.x; m.y = next.y;
         }
         m.lastMoveTime = 0;
       }
 
-      // 繁殖ロジック：エネルギー閾値を超えたら分裂
       if (m.energy > m.genes.reproThreshold) {
         m.energy /= 2;
-        let child = createMonster(m.x, m.y, m.type, {...m.genes}, m.generation + 1, m.id);
-        game.monsters.push(child);
+        game.monsters.push(createMonster(m.x, m.y, m.type, {...m.genes}, m.generation + 1, m.id));
         addParticle(m.x, m.y, '#ffff00');
       }
 
-      // 死亡判定
       if (m.energy <= 0) game.monsters.splice(i, 1);
     }
 
-    // 勇者AI：探索と戦闘
     game.heroes.forEach((h, idx) => {
       h.timer += dt;
       if (h.timer > 0.8) {
         h.timer = 0;
-        // 最も魔物密度が高い地点へ移動
         let best = {x: h.x, y: h.y, score: -1};
-        for (let dx = -1; dx <= 1; dx++) {
-          for (let dy = -1; dy <= 1; dy++) {
-            let nx = h.x + dx, ny = h.y + dy;
-            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
-              let score = game.grid[nx][ny].length * 10 + Math.random() * 5;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            let ny = h.y + dy, nx = h.x + dx;
+            if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) {
+              let score = (game.grid[ny][nx] ? game.grid[ny][nx].length : 0) * 10 + Math.random();
               if (score > best.score) best = {x: nx, y: ny, score: score};
             }
           }
         }
         h.x = best.x; h.y = best.y;
-
-        // 接触した魔物への攻撃
-        let victims = game.grid[h.x][h.y];
-        if (victims.length > 0) {
-          victims[0].energy -= h.atk;
-        }
+        if (game.grid[h.y][h.x].length > 0) game.grid[h.y][h.x][0].energy -= h.atk;
       }
       if (h.hp <= 0) game.heroes.splice(idx, 1);
     });
 
-    // 勝敗判定
     if (game.monsters.length === 0) {
       game.phase = 'over';
-      game.message = 'ダンジョン崩壊...魔物が全滅しました';
+      game.message = 'ダンジョン崩壊...';
     } else if (game.heroes.length === 0) {
       game.round++;
       game.phase = 'dig';
       game.digsLeft = 10 + (game.round * 2);
-      game.message = `階層クリア！次へ進みます`;
     }
   }
 }

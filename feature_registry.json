@@ -9,10 +9,10 @@
     "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
   },
   "recent_sections": [
-    "STATE",
     "CONFIG",
     "INIT_INPUT",
-    "RENDER"
+    "RENDER",
+    "UPDATE"
   ],
   "implemented_features": [
     "[ECOSYSTEM] mutate()による遺伝子継承とcreateMonster()による魔物生成",
@@ -31,7 +31,8 @@
     "[STATE] gameオブジェクト内に魔王のステータス管理用プロパティを追加し、初期状態として playerX: 10, playerY: 0 を定義する。また、魔王の視界範…",
     "[CONFIG] マップデータ構造を保持する2次元配列の初期化ロジックを追加し、game.mapを {type: 'wall', nutrient: 0, filter: nul…",
     "[INIT_INPUT] キーボードイベントリスナーを実装し、十字キー（ArrowUp, ArrowDown, ArrowLeft, ArrowRight）入力時に魔王の座標(playe…",
-    "[RENDER] render()関数内に、魔王の現在位置（playerX, playerY）を中心とした視界範囲（VISIBILITY_RADIUS）のみを描画する「フォグ・オ…"
+    "[RENDER] render()関数内に、魔王の現在位置（playerX, playerY）を中心とした視界範囲（VISIBILITY_RADIUS）のみを描画する「フォグ・オ…",
+    "[UPDATE] 魔王の移動に合わせて隣接するwallを掘削し、groundへ変換するdig(x, y)関数を実装し、それをupdate()またはキーボードイベントから呼び出す。…"
   ],
   "failed_approaches": [
     "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",
