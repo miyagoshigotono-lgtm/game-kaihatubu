@@ -68,7 +68,7 @@ let game = {
   round: 1,
   digsLeft: 10,
   interferencePoints: 5,
-  nutrients: 0, // 魔王のインベントリ：所持している栄養素の総量
+  nutrients: 0,
   phase: 'dig',
   playerX: 10,
   playerY: 0,
@@ -78,8 +78,23 @@ let game = {
   grid: [],
   heroes: [],
   particles: [],
-  eventLog: [], // 掘削履歴ログ
+  eventLog: [],
   message: '魔王よ、地面を掘り、魔物の揺りかごを作れ (WASDキーで移動、隣接マスを採掘)',
+
+  // 入力制御システム
+  inputQueue: [],
+  isProcessingInput: false,
+  lastInputTime: 0,
+  inputCooldown: 150, // ミリ秒単位の入力間隔制限
+
+  /**
+   * キー入力のバッファリング
+   */
+  enqueueInput(key) {
+    if (this.inputQueue.length < 5) {
+      this.inputQueue.push(key);
+    }
+  },
 
   /**
    * 掘削履歴を記録し、メッセージを更新する
@@ -101,6 +116,15 @@ let game = {
            (x >= 0 && x < this.map.length) && 
            (y >= 0 && y < this.map[0].length) &&
            (this.map[x][y].type === 'wall');
+  },
+
+  /**
+   * 移動可能判定
+   */
+  canMove(x, y) {
+    return (x >= 0 && x < this.map.length) && 
+           (y >= 0 && y < this.map[0].length) &&
+           (this.map[x][y].type === 'empty');
   }
 };
 

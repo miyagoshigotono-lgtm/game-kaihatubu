@@ -488,5 +488,15 @@
     "task": "update(dt)関数内に、魔王の移動と掘削の入力処理を統合したメインループを実装する。具体的には、キーボードイベントリスナーから送られてくる入力キューを処理し、移動ならplayerX/Yを更新、掘削ならcanDig判定後にmapをgroundへ変更し、digsLeftを減算して魔物生成関数を呼び出すロジックを完成させる。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-30 07:10",
+    "cycle_type": "morning",
+    "cycle_number": 13,
+    "result": "success",
+    "target_section": "STATE",
+    "task": "gameオブジェクト内に『キー入力キュー』と『移動・掘削の入力判定フラグ』を追加し、キー押下時に即座に状態を更新するのではなく、一度バッファに格納してからメインループで処理する『入力制御システム』を実装する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]
