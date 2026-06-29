@@ -322,22 +322,23 @@ function onFilter(e) {
 
 // ===SECTION:UPDATE===
 function dig(x, y) {
-  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[y][x].value === 0 || game.digsLeft <= 0) return;
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[y][x].value === 0 || game.digsLeft <= 0) return false;
 
   game.map[y][x].value = 0;
   game.digsLeft--;
 
   const nutrient = game.map[y][x].nutrient;
-  if (Math.random() < nutrient * 0.3) {
-    const type = Math.random() < 0.3 ? 1 : 0;
+  if (Math.random() < nutrient * 0.4) {
+    const type = Math.random() < 0.4 ? 1 : 0;
     const genes = {
-      speed: 0.2 + Math.random() * 0.5,
-      size: 0.1 + Math.random() * 0.4,
-      reproThreshold: 50 + Math.random() * 50
+      speed: 0.3 + Math.random() * 0.4,
+      size: 0.2 + Math.random() * 0.3,
+      reproThreshold: 40 + Math.random() * 60
     };
-    game.monsters.push(createMonster(x, y, type, genes, 0, Math.random()));
+    game.monsters.push(createMonster(x, y, type, genes, 0, 50 + Math.random() * 50));
     addParticle(x, y, '#ffffff');
   }
+  return true;
 }
 
 function update(dt) {
@@ -347,13 +348,32 @@ function update(dt) {
   });
 
   if (game.phase === 'dig') {
-    const speed = 0.15;
-    if (keys['w']) game.player.y = Math.max(0, game.player.y - speed);
-    if (keys['s']) game.player.y = Math.min(ROWS - 1, game.player.y + speed);
-    if (keys['a']) game.player.x = Math.max(0, game.player.x - speed);
-    if (keys['d']) game.player.x = Math.min(COLS - 1, game.player.x + speed);
+    const moveSpeed = 4.0;
+    let nextX = game.player.x;
+    let nextY = game.player.y;
+
+    if (keys['w']) nextY -= moveSpeed * dt;
+    if (keys['s']) nextY += moveSpeed * dt;
+    if (keys['a']) nextX -= moveSpeed * dt;
+    if (keys['d']) nextX += moveSpeed * dt;
+
+    nextX = Math.max(0, Math.min(COLS - 1, nextX));
+    nextY = Math.max(0, Math.min(ROWS - 1, nextY));
+
+    if (game.map[Math.floor(nextY)][Math.floor(nextX)].value === 0) {
+      game.player.x = nextX;
+      game.player.y = nextY;
+    }
+
+    if (keys[' ']) {
+      const dx = [0, 0, 1, -1];
+      const dy = [1, -1, 0, 0];
+      for(let i=0; i<4; i++){
+        dig(Math.floor(game.player.x) + dx[i], Math.floor(game.player.y) + dy[i]);
+      }
+    }
     
-    if (keys[' ']) dig(Math.floor(game.player.x), Math.floor(game.player.y));
+    if (game.digsLeft <= 0 && game.monsters.length > 0) game.phase = 'battle';
   }
 
   if (game.phase === 'battle') {
@@ -361,23 +381,23 @@ function update(dt) {
 
     for (let i = game.monsters.length - 1; i >= 0; i--) {
       let m = game.monsters[i];
-      m.energy -= (m.genes.speed * 0.5 + m.genes.size * 0.2) * dt;
+      m.energy -= (m.genes.speed * 0.3 + m.genes.size * 0.1) * dt * 10;
 
       if (m.type === 1) {
-        let targets = game.grid[m.y][m.x].filter(o => o.type === 0 && o !== m);
+        let targets = game.grid[m.y] && game.grid[m.y][m.x] ? game.grid[m.y][m.x].filter(o => o.type === 0 && o !== m) : [];
         if (targets.length > 0) {
-          m.energy += targets[0].energy * 0.6;
-          targets[0].energy = -100;
+          m.energy += targets[0].energy * 0.8;
+          targets[0].energy = -1;
           addParticle(m.x, m.y, '#ff0000');
         }
       }
 
       m.lastMoveTime += dt;
-      if (m.lastMoveTime > (1.2 - m.genes.speed)) {
-        const directions = [[0,1],[0,-1],[1,0],[-1,0]];
-        const [dx, dy] = directions[Math.floor(Math.random() * 4)];
-        const nx = Math.max(0, Math.min(COLS - 1, m.x + dx));
-        const ny = Math.max(0, Math.min(ROWS - 1, m.y + dy));
+      if (m.lastMoveTime > (1.5 - m.genes.speed)) {
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+        const [dx, dy] = dirs[Math.floor(Math.random() * 4)];
+        const nx = Math.max(0, Math.min(COLS - 1, Math.floor(m.x) + dx));
+        const ny = Math.max(0, Math.min(ROWS - 1, Math.floor(m.y) + dy));
         if (game.map[ny][nx].value === 0) {
           m.x = nx; m.y = ny;
         }
@@ -386,7 +406,7 @@ function update(dt) {
 
       if (m.energy > m.genes.reproThreshold) {
         m.energy /= 2;
-        game.monsters.push(createMonster(m.x, m.y, m.type, {...m.genes}, m.generation + 1, Math.random()));
+        game.monsters.push(createMonster(m.x, m.y, m.type, {...m.genes}, m.generation + 1, m.energy));
         addParticle(m.x, m.y, '#ffff00');
       }
 
@@ -395,31 +415,29 @@ function update(dt) {
 
     game.heroes.forEach((h, idx) => {
       h.timer += dt;
-      if (h.timer > 1.0) {
+      if (h.timer > 0.8) {
         h.timer = 0;
         let best = {x: h.x, y: h.y, score: -1};
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
-            let ny = h.y + dy, nx = h.x + dx;
-            if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) {
-              let score = (game.grid[ny][nx] ? game.grid[ny][nx].length : 0) * 15 + Math.random();
-              if (score > best.score) best = {x: nx, y: ny, score: score};
-            }
+            let ny = Math.max(0, Math.min(ROWS-1, h.y + dy)), nx = Math.max(0, Math.min(COLS-1, h.x + dx));
+            let score = (game.grid[ny][nx] ? game.grid[ny][nx].length : 0) * 20 + Math.random() * 5;
+            if (score > best.score) best = {x: nx, y: ny, score: score};
           }
         }
         h.x = best.x; h.y = best.y;
-        if (game.grid[h.y][h.x].length > 0) game.grid[h.y][h.x][0].energy -= h.atk;
+        if (game.grid[h.y][h.x]) game.grid[h.y][h.x].forEach(m => m.energy -= h.atk);
       }
       if (h.hp <= 0) game.heroes.splice(idx, 1);
     });
 
-    if (game.monsters.length === 0) {
+    if (game.monsters.length === 0 && game.heroes.length > 0) {
       game.phase = 'over';
       game.message = 'ダンジョン生態系が崩壊しました';
     } else if (game.heroes.length === 0) {
       game.round++;
       game.phase = 'dig';
-      game.digsLeft = 10 + (game.round * 3);
+      game.digsLeft = 15 + (game.round * 5);
     }
   }
 }
