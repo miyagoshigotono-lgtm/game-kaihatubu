@@ -65,6 +65,7 @@ let game = {
   round: 1,
   digsLeft: 10,
   interferencePoints: 5,
+  nutrients: 0, // 魔王のインベントリ：所持している栄養素の総量
   phase: 'dig',
   playerX: 10,
   playerY: 0,
@@ -74,12 +75,25 @@ let game = {
   grid: [],
   heroes: [],
   particles: [],
-  message: '魔王よ、地面を掘り、魔物の揺りかごを作れ (十字キーで移動、隣接マスを採掘)',
+  eventLog: [], // 掘削履歴ログ
+  message: '魔王よ、地面を掘り、魔物の揺りかごを作れ (WASDキーで移動、隣接マスを採掘)',
 
+  /**
+   * 掘削履歴を記録し、メッセージを更新する
+   */
+  log(message) {
+    const timestamp = new Date().toLocaleTimeString('ja-JP', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    this.eventLog.unshift(`[${timestamp}] ${message}`);
+    if (this.eventLog.length > 50) this.eventLog.pop();
+    this.message = message;
+  },
+
+  /**
+   * 掘削可能判定
+   */
   canDig(x, y) {
     const dx = Math.abs(x - this.playerX);
     const dy = Math.abs(y - this.playerY);
-    // 隣接マスの定義（斜めを除く上下左右）
     return (dx + dy === 1) && 
            (x >= 0 && x < this.map.length) && 
            (y >= 0 && y < this.map[0].length) &&
@@ -91,16 +105,16 @@ function getAttractiveness(x, y) {
   const cell = game.map[x][y];
   if (!cell || !cell.filter) return 1.0;
   const f = cell.filter;
-  if (f === FILTERS.NURSERY) return 3.0;
-  if (f === FILTERS.SANCTUARY) return 2.0;
-  if (f === FILTERS.RESOURCE) return 2.5;
+  if (f === 'NURSERY') return 3.0;
+  if (f === 'SANCTUARY') return 2.0;
+  if (f === 'RESOURCE') return 2.5;
   return 1.0;
 }
 
 function addParticle(x, y, color, life = 1.0) {
   game.particles.push({
-    x: x * TILE + TILE / 2,
-    y: y * TILE + TILE / 2,
+    x: x * 32 + 16,
+    y: y * 32 + 16,
     vx: (Math.random() - 0.5) * 50,
     vy: (Math.random() - 0.5) * 50,
     life: life,
