@@ -229,7 +229,7 @@
       </div>
       <div class="status-msg" id="statusMsg"></div>
       <div class="hint">
-        手動実行にはGitHub Personal Access Token（actions:write権限）が必要です。
+        手動実行にはGitHub Personal Access Token が必要です（Classic PAT: <b>workflow</b> スコープ）。
         <span id="tokenState"></span>
         &nbsp;·&nbsp;<a href="#" onclick="resetToken(); return false;" style="color:#aaa;font-size:0.75rem;">トークンをリセット</a>
       </div>
@@ -286,7 +286,7 @@
     function getOrAskToken() {
       let t = localStorage.getItem('gh_pat');
       if (!t) {
-        t = prompt('GitHub Personal Access Token を入力してください\n（Settings → Developer settings → Personal access tokens → Fine-grained tokens\nまたは Classic tokens で actions:write / workflow 権限が必要）');
+        t = prompt('GitHub Personal Access Token を入力してください\n\n■ Classic PAT（推奨）\n  Settings → Developer settings → Personal access tokens → Tokens (classic)\n  スコープ: 「workflow」にチェック\n\n■ Fine-grained PAT\n  Repository permissions → Actions → Read and write');
         if (t) {
           localStorage.setItem('gh_pat', t.trim());
           updateTokenState();
@@ -320,7 +320,7 @@
           updateTokenState();
           setStatus('認証失敗（401）— トークンが無効か期限切れです。「トークンをリセット」して再入力してください。', 'ng');
         } else if (res.status === 403) {
-          setStatus('権限不足（403）— トークンに workflow または actions:write 権限があるか確認してください。', 'ng');
+          setStatus('権限不足（403）— Classic PAT は「workflow」スコープ、Fine-grained PAT は「Actions: Read and write」が必要です。トークンをリセットして再発行してください。', 'ng');
         } else if (res.status === 422) {
           let detail = '';
           try { detail = (await res.json()).message || ''; } catch (e) {}
