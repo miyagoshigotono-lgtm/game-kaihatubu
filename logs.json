@@ -388,5 +388,15 @@
     "task": "updateGrid()関数を完成させ、各グリッドセル内の魔物リストを管理するロジックを実装する。具体的には、mapの各座標(x, y)に対して、現在位置がその座標と一致する魔物をフィルタリングして格納し、さらに捕食判定を行うcheckPredation(cellMonsters)関数を呼び出す仕組みを構築する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-29 21:58",
+    "cycle_type": "lunch",
+    "cycle_number": 33,
+    "result": "success",
+    "target_section": "INIT_INPUT",
+    "task": "キーボードイベントリスナーを拡張し、魔王の移動（WASD）と連動して隣接マスを掘削する『dig(x, y)』関数を実装する。掘削時には『game.digsLeft』を消費し、掘削後の地面に『createMonster』を呼び出して魔物を配置するロジックを統合する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

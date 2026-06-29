@@ -212,21 +212,23 @@ function init() {
   game.interferencePoints = 5 + game.round;
   playerX = Math.floor(COLS / 2);
   playerY = 0;
-  game.message = `ラウンド ${game.round}：十字キーで移動、壁に接触して採掘せよ。残り:${game.digsLeft}`;
+  game.message = `ラウンド ${game.round}：WASD/矢印キーで移動・掘削。残り:${game.digsLeft}`;
   updateGrid();
 }
 
-function onDig(x, y) {
-  if (game.phase !== 'dig' || game.digsLeft <= 0) return;
-  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[x][y].type !== 'wall') return;
+function dig(x, y) {
+  if (game.phase !== 'dig' || game.digsLeft <= 0) return false;
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[x][y].type !== 'wall') return false;
 
   game.map[x][y].type = 'ground';
   game.digsLeft--;
 
-  if (Math.random() < 0.7) {
-    game.monsters.push(createMonster(x, y, Math.random() > 0.5 ? 'slime' : 'bat'));
-  }
+  // 魔物自動生成
+  const monsterTypes = ['slime', 'bat', 'skeleton'];
+  const type = monsterTypes[Math.floor(Math.random() * monsterTypes.length)];
+  game.monsters.push(createMonster(x, y, type));
 
+  // 掘削完了判定
   if (game.digsLeft <= 0) {
     game.phase = 'battle';
     game.message = '掘削終了。勇者の侵攻が始まった！';
@@ -237,27 +239,29 @@ function onDig(x, y) {
     game.message = `採掘中... 残り:${game.digsLeft}`;
   }
   updateGrid();
+  return true;
 }
 
 window.addEventListener('keydown', (e) => {
   if (game.phase === 'over') { game.round = 1; init(); return; }
   if (game.phase !== 'dig') return;
 
-  let dx = 0, dy = 0;
-  switch (e.key) {
-    case 'ArrowUp': dy = -1; break;
-    case 'ArrowDown': dy = 1; break;
-    case 'ArrowLeft': dx = -1; break;
-    case 'ArrowRight': dx = 1; break;
-    default: return;
-  }
+  const moves = {
+    'ArrowUp': [0, -1], 'w': [0, -1],
+    'ArrowDown': [0, 1], 's': [0, 1],
+    'ArrowLeft': [-1, 0], 'a': [-1, 0],
+    'ArrowRight': [1, 0], 'd': [1, 0]
+  };
 
+  if (!moves[e.key]) return;
+
+  const [dx, dy] = moves[e.key];
   const nx = playerX + dx;
   const ny = playerY + dy;
 
   if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
     if (game.map[nx][ny].type === 'wall') {
-      onDig(nx, ny);
+      dig(nx, ny);
     } else {
       playerX = nx;
       playerY = ny;
