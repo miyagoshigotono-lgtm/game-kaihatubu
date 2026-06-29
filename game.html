@@ -16,39 +16,45 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-const COLS = 20;
-const ROWS = 15;
-const HUD_HEIGHT = 120;
-const TILE_SIZE = Math.min(window.innerWidth / COLS, (window.innerHeight - HUD_HEIGHT) / ROWS);
+const COLS = 24;
+const ROWS = 18;
+const HUD_HEIGHT = 100;
+const TILE_SIZE = Math.floor(Math.min(window.innerWidth / COLS, (window.innerHeight - HUD_HEIGHT) / ROWS));
 
 let mouseX = 0;
 let mouseY = 0;
-let playerX = Math.floor(COLS / 2);
-let playerY = 0;
+
+const player = {
+    x: Math.floor(COLS / 2),
+    y: 0
+};
+
+const TILE_TYPES = {
+    WALL: { id: 'wall', hardness: 10, nutrient: 20 },
+    GROUND: { id: 'ground', hardness: 0, nutrient: 5 }
+};
 
 const FILTERS = { NONE: null, NURSERY: 'NURSERY', SANCTUARY: 'SANCTUARY', RESOURCE: 'RESOURCE' };
-const VISIBILITY_RADIUS = 3;
 
-let map = [];
+let map = {};
 
 function initMap() {
-    map = [];
+    map = {};
     for (let y = 0; y < ROWS; y++) {
-        map[y] = [];
         for (let x = 0; x < COLS; x++) {
-            map[y][x] = {
-                type: 'wall',
-                nutrient: Math.floor(Math.random() * 50),
-                filter: FILTERS.NONE
+            const isPlayerStart = (x === player.x && y === player.y);
+            const type = isPlayerStart ? TILE_TYPES.GROUND : TILE_TYPES.WALL;
+            
+            map[`${x},${y}`] = {
+                type: type.id,
+                hardness: type.hardness,
+                nutrient: isPlayerStart ? 0 : Math.floor(Math.random() * 50) + type.nutrient,
+                filter: FILTERS.NONE,
+                x: x,
+                y: y
             };
         }
     }
-    
-    map[playerY][playerX] = {
-        type: 'ground',
-        nutrient: 0,
-        filter: FILTERS.NONE
-    };
 }
 
 initMap();
