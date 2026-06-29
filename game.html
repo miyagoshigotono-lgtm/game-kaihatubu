@@ -24,9 +24,15 @@ const TILE_SIZE = Math.floor(Math.min(window.innerWidth / COLS, (window.innerHei
 let mouseX = 0;
 let mouseY = 0;
 
-const player = {
-    x: Math.floor(COLS / 2),
-    y: 0
+const game = {
+    map: [],
+    monsters: [],
+    heroes: [],
+    phase: 'MINING',
+    player: {
+        x: Math.floor(COLS / 2),
+        y: 0
+    }
 };
 
 const TILE_TYPES = {
@@ -36,22 +42,19 @@ const TILE_TYPES = {
 
 const FILTERS = { NONE: null, NURSERY: 'NURSERY', SANCTUARY: 'SANCTUARY', RESOURCE: 'RESOURCE' };
 
-let map = {};
-
 function initMap() {
-    map = {};
-    for (let y = 0; y < ROWS; y++) {
-        for (let x = 0; x < COLS; x++) {
-            const isPlayerStart = (x === player.x && y === player.y);
+    game.map = new Array(COLS);
+    for (let x = 0; x < COLS; x++) {
+        game.map[x] = new Array(ROWS);
+        for (let y = 0; y < ROWS; y++) {
+            const isPlayerStart = (x === game.player.x && y === game.player.y);
             const type = isPlayerStart ? TILE_TYPES.GROUND : TILE_TYPES.WALL;
             
-            map[`${x},${y}`] = {
+            game.map[x][y] = {
                 type: type.id,
                 hardness: type.hardness,
                 nutrient: isPlayerStart ? 0 : Math.floor(Math.random() * 50) + type.nutrient,
-                filter: FILTERS.NONE,
-                x: x,
-                y: y
+                filter: FILTERS.NONE
             };
         }
     }

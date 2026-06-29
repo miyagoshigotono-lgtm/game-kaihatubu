@@ -9,10 +9,10 @@
     "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
   },
   "recent_sections": [
-    "UPDATE",
     "RENDER",
     "INIT_INPUT",
-    "ECOSYSTEM"
+    "ECOSYSTEM",
+    "CONFIG"
   ],
   "implemented_features": [
     "[ECOSYSTEM] mutate()による遺伝子継承とcreateMonster()による魔物生成",
@@ -41,7 +41,8 @@
     "[UPDATE] update(dt)関数内に、魔王の移動および掘削後の「魔物生成ロジック」を実装する。具体的には、掘削によってtypeが'wall'から'ground'に変化し…",
     "[RENDER] render()関数を拡張し、魔王の現在位置（playerX, playerY）を視覚的に強調する専用の描画ロジックを追加する。具体的には、魔王の座標に半透明の…",
     "[INIT_INPUT] キーボード入力（WASD）を「移動」と「掘削」に分離する。具体的には、キー入力時に隣接マスが壁なら掘削アクション（dig関数実行）、空き地なら移動アクション（p…",
-    "[ECOSYSTEM] createMonster関数を完成させ、遺伝子情報の初期化および栄養素に基づいた魔物のステータス生成ロジックを実装する。具体的には、引数に受け取ったnutri…"
+    "[ECOSYSTEM] createMonster関数を完成させ、遺伝子情報の初期化および栄養素に基づいた魔物のステータス生成ロジックを実装する。具体的には、引数に受け取ったnutri…",
+    "[CONFIG] マップデータ構造を、現在のオブジェクト形式から、2次元配列（game.map[x][y]）へ統一・再構築する。具体的には、initMap関数を修正し、map[x…"
   ],
   "failed_approaches": [
     "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",

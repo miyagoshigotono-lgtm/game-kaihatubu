@@ -468,5 +468,15 @@
     "task": "createMonster関数を完成させ、遺伝子情報の初期化および栄養素に基づいた魔物のステータス生成ロジックを実装する。具体的には、引数に受け取ったnutrient値を用いて、speed, metabolism, reproThreshold, sizeの各遺伝子を計算し、生成された魔物オブジェクトをgame.monsters配列に格納する処理を記述する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-30 05:24",
+    "cycle_type": "lunch",
+    "cycle_number": 36,
+    "result": "success",
+    "target_section": "CONFIG",
+    "task": "マップデータ構造を、現在のオブジェクト形式から、2次元配列（game.map[x][y]）へ統一・再構築する。具体的には、initMap関数を修正し、map[x][y]形式で各タイルのプロパティ（type, hardness, nutrient, filter）にアクセスできるよう初期化処理を刷新する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]
