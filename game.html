@@ -68,31 +68,59 @@ function createMonster(x, y, type, parentGenes = null, generation = 1, parentId 
     speed: mutate(parentGenes.speed, nutrient),
     metabolism: mutate(parentGenes.metabolism, nutrient),
     reproThreshold: mutate(parentGenes.reproThreshold, nutrient),
-    size: mutate(parentGenes.size || 1.0, nutrient)
+    size: mutate(parentGenes.size || 1.0, nutrient),
+    appearance: {
+      shapeType: parentGenes.appearance.shapeType,
+      colorBase: Math.max(0, Math.min(360, parentGenes.appearance.colorBase + (Math.random() * 40 - 20)))
+    }
   } : {
     speed: 0.5 + Math.random() * 0.5,
     metabolism: 0.8 + Math.random() * 0.4,
     reproThreshold: 80 + Math.random() * 40,
-    size: 0.8 + Math.random() * 0.4
+    size: 0.8 + Math.random() * 0.4,
+    appearance: {
+      shapeType: Math.floor(Math.random() * 3),
+      colorBase: type === 1 ? Math.random() * 60 : 180 + Math.random() * 120
+    }
   };
-  return { id: ++monsterCounter, parentId, generation, x, y, hp: 10, type, energy: 50, lastMoveTime: 0, genes, isSettled: false };
+
+  return { 
+    id: ++monsterCounter, 
+    parentId, 
+    generation, 
+    x, y, 
+    hp: 10 + (genes.size * 5), 
+    type, 
+    energy: 50, 
+    lastMoveTime: 0, 
+    genes, 
+    isSettled: false,
+    alpha: 0.8 + (genes.size * 0.2)
+  };
 }
 
 function updateGrid() {
   game.grid = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => []));
   game.monsters.forEach(m => {
     if (m.x >= 0 && m.x < COLS && m.y >= 0 && m.y < ROWS) {
-      game.grid[m.x][m.y].push(m);
+      game.grid[Math.floor(m.x)][Math.floor(m.y)].push(m);
     }
   });
 }
 
 function resize() {
+  const pixelRatio = window.devicePixelRatio || 1;
   const availW = window.innerWidth;
   const availH = window.innerHeight - HUD;
   TILE = Math.floor(Math.min(availW / COLS, availH / ROWS));
-  canvas.width = COLS * TILE;
-  canvas.height = ROWS * TILE + HUD;
+  
+  canvas.width = COLS * TILE * pixelRatio;
+  canvas.height = (ROWS * TILE + HUD) * pixelRatio;
+  canvas.style.width = (COLS * TILE) + "px";
+  canvas.style.height = (ROWS * TILE + HUD) + "px";
+  
+  const ctx = canvas.getContext('2d');
+  ctx.scale(pixelRatio, pixelRatio);
 }
 // ===END:ECOSYSTEM===
 
