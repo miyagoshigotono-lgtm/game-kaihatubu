@@ -9,10 +9,10 @@
     "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
   },
   "recent_sections": [
-    "RENDER",
     "CONFIG",
     "STATE",
-    "UPDATE"
+    "UPDATE",
+    "RENDER"
   ],
   "implemented_features": [
     "[ECOSYSTEM] mutate()による遺伝子継承とcreateMonster()による魔物生成",
@@ -38,7 +38,8 @@
     "[RENDER] render()関数内に、HUD（画面下部）の描画処理を実装する。具体的には、現在のラウンド数、残り掘削回数(digsLeft)、干渉ポイント、およびプレイヤー…",
     "[CONFIG] マップデータ構造の定義を、現在の1次元的な配列構造から、x,y座標をキーとして直接アクセス可能なオブジェクト形式、またはグリッド計算を最適化した2次元配列構造へ…",
     "[STATE] gameオブジェクト内に『掘削履歴ログ』と『魔王のインベントリ（所持している栄養素の総量）』を管理するプロパティを追加し、掘削時に発生するイベントを記録する配列…",
-    "[UPDATE] update(dt)関数内に、魔王の移動および掘削後の「魔物生成ロジック」を実装する。具体的には、掘削によってtypeが'wall'から'ground'に変化し…"
+    "[UPDATE] update(dt)関数内に、魔王の移動および掘削後の「魔物生成ロジック」を実装する。具体的には、掘削によってtypeが'wall'から'ground'に変化し…",
+    "[RENDER] render()関数を拡張し、魔王の現在位置（playerX, playerY）を視覚的に強調する専用の描画ロジックを追加する。具体的には、魔王の座標に半透明の…"
   ],
   "failed_approaches": [
     "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",

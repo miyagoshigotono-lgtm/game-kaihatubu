@@ -433,13 +433,15 @@ function render() {
       ctx.fillStyle = visible ? `rgb(${d * 30}, ${d * 120 + 20}, ${d * 60})` : '#050505';
       ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
 
-      // 掘削可能マスのハイライト
+      // 掘削ガイド：隣接する掘削可能マスに黄色い���線
       const dx = Math.abs(x - game.playerX);
       const dy = Math.abs(y - game.playerY);
       if (game.digsLeft > 0 && ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) && game.map[x][y].value > 0) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4);
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([4, 2]);
+        ctx.strokeRect(x * TILE + 4, y * TILE + 4, TILE - 8, TILE - 8);
+        ctx.setLineDash([]);
       }
 
       if (visible && game.map[x][y].filter) {
@@ -449,28 +451,39 @@ function render() {
     }
   }
 
+  // 魔王の強調オーラ
+  const px = game.playerX * TILE + TILE / 2;
+  const py = game.playerY * TILE + TILE / 2;
+  const auraGradient = ctx.createRadialGradient(px, py, 5, px, py, TILE * 1.5);
+  auraGradient.addColorStop(0, 'rgba(0, 150, 255, 0.4)');
+  auraGradient.addColorStop(1, 'rgba(0, 50, 255, 0)');
+  ctx.fillStyle = auraGradient;
+  ctx.beginPath();
+  ctx.arc(px, py, TILE * 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
   // 魔物描画
   game.monsters.forEach(m => {
     if (!isVisible(m.x, m.y)) return;
-    const px = m.x * TILE + TILE / 2;
-    const py = m.y * TILE + TILE / 2;
+    const mx = m.x * TILE + TILE / 2;
+    const my = m.y * TILE + TILE / 2;
     const size = (TILE / 2.5) * (m.genes.size || 1);
     ctx.fillStyle = `hsl(${m.appearance.colorBase}, 70%, 50%)`;
     ctx.beginPath();
     if (m.appearance.shapeType === 0) {
-      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.arc(mx, my, size, 0, Math.PI * 2);
     } else if (m.appearance.shapeType === 1) {
       for (let i = 0; i < 4; i++) {
         const angle = (i * Math.PI / 2) + Math.PI / 4;
-        const x = px + Math.cos(angle) * size * 1.2;
-        const y = py + Math.sin(angle) * size * 1.2;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        const vx = mx + Math.cos(angle) * size * 1.2;
+        const vy = my + Math.sin(angle) * size * 1.2;
+        i === 0 ? ctx.moveTo(vx, vy) : ctx.lineTo(vx, vy);
       }
     } else {
       for (let i = 0; i < 10; i++) {
         const r = i % 2 === 0 ? size : size / 1.5;
         const angle = (i * Math.PI / 5) - Math.PI / 2;
-        ctx.lineTo(px + Math.cos(angle) * r, py + Math.sin(angle) * r);
+        ctx.lineTo(mx + Math.cos(angle) * r, my + Math.sin(angle) * r);
       }
     }
     ctx.closePath();
@@ -491,7 +504,7 @@ function render() {
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       if (!isVisible(x, y)) {
-        ctx.fillStyle = 'rgba(0,0,0,0.9)';
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
         ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
       }
     }
