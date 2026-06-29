@@ -469,119 +469,102 @@ function update(dt) {
 
 // ===SECTION:RENDER===
 function render() {
-  ctx.fillStyle = '#0a0a0a';
+  const HUD_HEIGHT = 120;
+  const mapAreaHeight = canvas.height - HUD_HEIGHT;
+
+  // 背景クリア
+  ctx.fillStyle = '#050505';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const VISIBILITY_RADIUS = 5;
-  const HUD_HEIGHT = 120;
-  const mapHeight = canvas.height - HUD_HEIGHT;
-
-  function isVisible(x, y) {
+  // 視界判定関数
+  const isVisible = (x, y) => {
     const dx = x - game.playerX;
     const dy = y - game.playerY;
-    return Math.sqrt(dx * dx + dy * dy) <= VISIBILITY_RADIUS;
-  }
+    return Math.sqrt(dx * dx + dy * dy) <= 6; // VISIBILITY_RADIUS
+  };
 
-  // 地形描画
+  // 1. 地形描画ループ
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
+      const tile = game.map[x][y];
       const visible = isVisible(x, y);
-      const d = Math.min(1, game.map[x][y].value / 3);
-      ctx.fillStyle = visible ? `rgb(${d * 30}, ${d * 120 + 20}, ${d * 60})` : '#050505';
-      ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
+      
+      // 地形色：WALL(グレー系) vs GROUND(黒～栄養値に応じた赤黒い土)
+      const brightness = tile.value > 0 ? (tile.value * 20) : 0;
+      const baseColor = tile.value > 0 ? `rgb(${30 + brightness}, ${20 + brightness / 2}, ${20 + brightness / 2})` : '#0a0a0a';
+      
+      ctx.fillStyle = visible ? baseColor : '#000000';
+      ctx.fillRect(x * TILE, y * TILE, TILE - 1, TILE - 1);
 
-      // 掘削ガイド：隣接する掘削可能マスに黄色い���線
+      // 掘削ガイド（隣接マス）
       const dx = Math.abs(x - game.playerX);
       const dy = Math.abs(y - game.playerY);
-      if (game.digsLeft > 0 && ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) && game.map[x][y].value > 0) {
-        ctx.strokeStyle = '#ffd700';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([4, 2]);
+      if (visible && game.digsLeft > 0 && ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) && tile.value > 0) {
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+        ctx.lineWidth = 2;
         ctx.strokeRect(x * TILE + 4, y * TILE + 4, TILE - 8, TILE - 8);
-        ctx.setLineDash([]);
-      }
-
-      if (visible && game.map[x][y].filter) {
-        ctx.fillStyle = game.map[x][y].filter === FILTERS.NURSERY ? 'rgba(100,255,100,0.3)' : 'rgba(255,255,100,0.3)';
-        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
       }
     }
   }
 
-  // 魔王の強調オーラ
+  // 2. 魔王強調エフェクト（パルス）
   const px = game.playerX * TILE + TILE / 2;
   const py = game.playerY * TILE + TILE / 2;
-  const auraGradient = ctx.createRadialGradient(px, py, 5, px, py, TILE * 1.5);
-  auraGradient.addColorStop(0, 'rgba(0, 150, 255, 0.4)');
-  auraGradient.addColorStop(1, 'rgba(0, 50, 255, 0)');
-  ctx.fillStyle = auraGradient;
+  const pulse = Math.sin(Date.now() / 300) * 5 + 10;
+  const grad = ctx.createRadialGradient(px, py, 0, px, py, TILE * 2);
+  grad.addColorStop(0, 'rgba(100, 200, 255, 0.3)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.arc(px, py, TILE * 1.5, 0, Math.PI * 2);
+  ctx.arc(px, py, TILE * 2 + pulse, 0, Math.PI * 2);
   ctx.fill();
 
-  // 魔物描画
+  // 3. 魔物描画
   game.monsters.forEach(m => {
     if (!isVisible(m.x, m.y)) return;
     const mx = m.x * TILE + TILE / 2;
     const my = m.y * TILE + TILE / 2;
-    const size = (TILE / 2.5) * (m.genes.size || 1);
-    ctx.fillStyle = `hsl(${m.appearance.colorBase}, 70%, 50%)`;
+    ctx.fillStyle = `hsl(${m.appearance.colorBase}, 80%, 60%)`;
     ctx.beginPath();
     if (m.appearance.shapeType === 0) {
-      ctx.arc(mx, my, size, 0, Math.PI * 2);
-    } else if (m.appearance.shapeType === 1) {
-      for (let i = 0; i < 4; i++) {
-        const angle = (i * Math.PI / 2) + Math.PI / 4;
-        const vx = mx + Math.cos(angle) * size * 1.2;
-        const vy = my + Math.sin(angle) * size * 1.2;
-        i === 0 ? ctx.moveTo(vx, vy) : ctx.lineTo(vx, vy);
-      }
+      ctx.arc(mx, my, TILE / 3, 0, Math.PI * 2);
     } else {
-      for (let i = 0; i < 10; i++) {
-        const r = i % 2 === 0 ? size : size / 1.5;
-        const angle = (i * Math.PI / 5) - Math.PI / 2;
-        ctx.lineTo(mx + Math.cos(angle) * r, my + Math.sin(angle) * r);
-      }
+      ctx.rect(mx - TILE / 3, my - TILE / 3, TILE / 1.5, TILE / 1.5);
     }
-    ctx.closePath();
     ctx.fill();
   });
 
-  // 勇者描画
+  // 4. 勇者描画
   game.heroes.forEach(h => {
     if (!isVisible(h.x, h.y)) return;
-    ctx.fillStyle = '#ff4444';
-    ctx.shadowBlur = 15;
+    ctx.fillStyle = '#ff3333';
+    ctx.shadowBlur = 10;
     ctx.shadowColor = '#ff0000';
-    ctx.fillRect(h.x * TILE + 4, h.y * TILE + 4, TILE - 8, TILE - 8);
+    ctx.fillRect(h.x * TILE + 5, h.y * TILE + 5, TILE - 10, TILE - 10);
     ctx.shadowBlur = 0;
   });
 
-  // フォグ描画
+  // 5. フォグ描画
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
-      if (!isVisible(x, y)) {
-        ctx.fillStyle = 'rgba(0,0,0,0.85)';
-        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-      }
+      if (!isVisible(x, y)) ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
     }
   }
 
-  // HUD描画
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, mapHeight, canvas.width, HUD_HEIGHT);
+  // 6. HUD描画（UI）
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, mapAreaHeight, canvas.width, HUD_HEIGHT);
   ctx.strokeStyle = '#333';
-  ctx.strokeRect(0, mapHeight, canvas.width, HUD_HEIGHT);
+  ctx.strokeRect(0, mapAreaHeight, canvas.width, HUD_HEIGHT);
 
-  ctx.fillStyle = '#00ffcc';
-  ctx.font = 'bold 18px "Courier New"';
-  ctx.fillText(`ROUND: ${game.round}`, 30, mapHeight + 40);
-  ctx.fillText(`DIGS LEFT: ${game.digsLeft}`, 200, mapHeight + 40);
-  ctx.fillText(`INTERFERENCE: ${game.interferencePoints}`, 400, mapHeight + 40);
-
-  ctx.fillStyle = '#cccccc';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 20px "Courier New"';
+  ctx.fillText(`ROUND: ${game.round}`, 20, mapAreaHeight + 40);
+  ctx.fillText(`DIGS LEFT: ${game.digsLeft}`, 200, mapAreaHeight + 40);
+  ctx.fillStyle = '#aaa';
   ctx.font = '14px monospace';
-  ctx.fillText(`MESSAGE: ${game.message}`, 30, mapHeight + 80);
+  ctx.fillText(`SYSTEM MESSAGE: ${game.message}`, 20, mapAreaHeight + 80);
 }
 // ===END:RENDER===
 
