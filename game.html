@@ -29,16 +29,31 @@ let game = {
   digsLeft: 10,
   interferencePoints: 5,
   phase: 'dig',
+  playerX: 10,
+  playerY: 0,
+  visionRadius: 3,
   map: [],
   monsters: [],
   grid: [],
   heroes: [],
   particles: [],
-  message: '魔王よ、地面を掘り、魔物の揺りかごを作れ (右クリックで環境フィルター設置)'
+  message: '魔王よ、地面を掘り、魔物の揺りかごを作れ (十字キーで移動、隣接マスを採掘)',
+
+  canDig(x, y) {
+    const dx = Math.abs(x - this.playerX);
+    const dy = Math.abs(y - this.playerY);
+    // 隣接マスの定義（斜めを除く上下左右）
+    return (dx + dy === 1) && 
+           (x >= 0 && x < this.map.length) && 
+           (y >= 0 && y < this.map[0].length) &&
+           (this.map[x][y].type === 'wall');
+  }
 };
 
 function getAttractiveness(x, y) {
-  const f = game.map[x][y].filter;
+  const cell = game.map[x][y];
+  if (!cell || !cell.filter) return 1.0;
+  const f = cell.filter;
   if (f === FILTERS.NURSERY) return 3.0;
   if (f === FILTERS.SANCTUARY) return 2.0;
   if (f === FILTERS.RESOURCE) return 2.5;
