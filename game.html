@@ -205,83 +205,103 @@ function onFilter(e) {
 
 // ===SECTION:UPDATE===
 function update(dt) {
+  // パーティクル処理
   game.particles.forEach((p, i) => {
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
-    if(p.life <= 0) game.particles.splice(i, 1);
+    if (p.life <= 0) game.particles.splice(i, 1);
   });
 
   if (game.phase === 'battle') {
-    const predators = game.monsters.filter(m => m.type === 1);
-    const preys = game.monsters.filter(m => m.type === 0);
-    const preyRatio = preys.length > 0 ? predators.length / preys.length : 5.0;
+    // グリッドの同期（魔物の現在地を更新）
+    updateGrid();
 
     for (let i = game.monsters.length - 1; i >= 0; i--) {
       let m = game.monsters[i];
-      let metabolism = (Math.pow(m.genes.speed, 2) * m.genes.size * m.genes.metabolism);
-      if (m.type === 1) metabolism *= (1.0 + preyRatio * 2.0);
-      m.energy -= metabolism * dt * 5;
-      m.lastMoveTime += dt;
+      
+      // 代謝計算：速度とサイズに基づきエネルギー消費
+      let metabolism = (m.genes.speed * 0.5 + m.genes.size * 0.2) * dt;
+      m.energy -= metabolism;
 
-      if (m.type === 1 && game.map[m.x][m.y].filter !== FILTERS.SANCTUARY) {
-        let preyIdx = game.grid[m.x][m.y].findIndex(o => o.type === 0);
-        if (preyIdx !== -1) {
-          m.energy += game.grid[m.x][m.y][preyIdx].energy;
-          game.grid[m.x][m.y][preyIdx].energy = -1;
-          for(let k=0; k<5; k++) addParticle(m.x, m.y, '#ff00ff');
+      // 捕食判定（肉食個体が隣接マスまたは同マスの獲物を捕食）
+      if (m.type === 1) {
+        let targets = game.grid[m.x][m.y].filter(o => o.type === 0);
+        if (targets.length > 0) {
+          let prey = targets[0];
+          m.energy += prey.energy * 0.5;
+          prey.energy = -1; // 死亡フラグ
+          addParticle(m.x, m.y, '#ff0000');
         }
       }
 
-      let moveThreshold = (1.5 - m.genes.speed) * 0.5;
-      if (m.lastMoveTime > moveThreshold) {
-        let bestScore = -1, bestPos = {x: m.x, y: m.y};
-        for(let dx=-1; dx<=1; dx++) {
-          for(let dy=-1; dy<=1; dy++) {
+      // 移動ロジック：speedに応じた移動頻度
+      m.lastMoveTime += dt;
+      if (m.lastMoveTime > (1.1 - m.genes.speed)) {
+        let options = [];
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
             let nx = m.x + dx, ny = m.y + dy;
-            if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny].value > 0) {
-              let score = getAttractiveness(nx, ny);
-              if(score > bestScore) { bestScore = score; bestPos = {x: nx, y: ny}; }
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny].value > 0) {
+              options.push({x: nx, y: ny});
             }
           }
         }
-        if (Math.random() < 0.9) { m.x = bestPos.x; m.y = bestPos.y; }
-        m.isSettled = (bestScore > 1.2);
+        if (options.length > 0) {
+          let next = options[Math.floor(Math.random() * options.length)];
+          m.x = next.x; m.y = next.y;
+        }
         m.lastMoveTime = 0;
       }
 
-      let reproChance = (game.map[m.x][m.y].filter === FILTERS.NURSERY) ? 0.05 : 0.005;
-      if (m.energy > m.genes.reproThreshold && game.map[m.x][m.y].value > 0.2 && Math.random() < reproChance) {
+      // 繁殖ロジック：エネルギー閾値を超えたら分裂
+      if (m.energy > m.genes.reproThreshold) {
         m.energy /= 2;
-        game.monsters.push(createMonster(m.x, m.y, m.type, m.genes, m.generation + 1, m.id, game.map[m.x][m.y].value));
-        for(let k=0; k<3; k++) addParticle(m.x, m.y, '#00ff00');
+        let child = createMonster(m.x, m.y, m.type, {...m.genes}, m.generation + 1, m.id);
+        game.monsters.push(child);
+        addParticle(m.x, m.y, '#ffff00');
       }
-      if (m.energy <= 0) { game.monsters.splice(i, 1); }
+
+      // 死亡判定
+      if (m.energy <= 0) game.monsters.splice(i, 1);
     }
 
+    // 勇者AI：探索と戦闘
     game.heroes.forEach((h, idx) => {
-      h.t += dt;
-      if (h.t > 1.0) {
-        h.t = 0;
-        let bestScore = -1, next = {x: h.x, y: h.y};
-        for(let dx=-1; dx<=1; dx++) {
-          for(let dy=-1; dy<=1; dy++) {
+      h.timer += dt;
+      if (h.timer > 0.8) {
+        h.timer = 0;
+        // 最も魔物密度が高い地点へ移動
+        let best = {x: h.x, y: h.y, score: -1};
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
             let nx = h.x + dx, ny = h.y + dy;
-            if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny].value > 0) {
-              let score = game.map[nx][ny].value + (game.grid[nx][ny].length * 2);
-              if(score > bestScore) { bestScore = score; next = {x: nx, y: ny}; }
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+              let score = game.grid[nx][ny].length * 10 + Math.random() * 5;
+              if (score > best.score) best = {x: nx, y: ny, score: score};
             }
           }
         }
-        h.x = next.x; h.y = next.y;
-        let target = game.grid[h.x][h.y] ? game.grid[h.x][h.y][0] : null;
-        if (target) { target.energy -= 20; game.map[h.x][h.y].value -= 0.1; }
+        h.x = best.x; h.y = best.y;
+
+        // 接触した魔物への攻撃
+        let victims = game.grid[h.x][h.y];
+        if (victims.length > 0) {
+          victims[0].energy -= h.atk;
+        }
       }
       if (h.hp <= 0) game.heroes.splice(idx, 1);
     });
 
-    if (game.monsters.length === 0 && game.heroes.length > 0) { game.phase = 'over'; game.message = '魔物が全滅した... クリックで再挑戦'; }
-    else if (game.heroes.length === 0) { game.round++; game.phase = 'dig'; game.digsLeft = 10 + (game.round - 1) * 2; game.message = '防衛成功！次の階層へ'; }
+    // 勝敗判定
+    if (game.monsters.length === 0) {
+      game.phase = 'over';
+      game.message = 'ダンジョン崩壊...魔物が全滅しました';
+    } else if (game.heroes.length === 0) {
+      game.round++;
+      game.phase = 'dig';
+      game.digsLeft = 10 + (game.round * 2);
+      game.message = `階層クリア！次へ進みます`;
+    }
   }
-  updateGrid();
 }
 // ===END:UPDATE===
 
