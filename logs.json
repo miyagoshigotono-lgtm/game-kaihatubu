@@ -338,5 +338,15 @@
     "task": "gameオブジェクト内に魔王のステータス管理用プロパティを追加し、初期状態として playerX: 10, playerY: 0 を定義する。また、魔王の視界範囲を制御する 'visionRadius: 3' を追加し、採掘可能な範囲を計算するためのヘルパー関数 'canDig(x, y)' を実装する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-29 18:34",
+    "cycle_type": "lunch",
+    "cycle_number": 31,
+    "result": "success",
+    "target_section": "CONFIG",
+    "task": "マップデータ構造を保持する2次元配列の初期化ロジックを追加し、game.mapを {type: 'wall', nutrient: 0, filter: null} のオブジェクトで初期化する関数 initMap() を定義する。また、魔王の初期位置(playerX, playerY)のタイルを 'ground' に変更し、視界範囲を表示するための定数設定を行う。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

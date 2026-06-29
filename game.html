@@ -15,12 +15,43 @@
 // ===SECTION:CONFIG===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const COLS = 20, ROWS = 15;
-const HUD = 120;
-let TILE = 40;
-let monsterCounter = 0;
+
+const COLS = 20;
+const ROWS = 15;
+const HUD_HEIGHT = 120;
+const TILE_SIZE = Math.min(window.innerWidth / COLS, (window.innerHeight - HUD_HEIGHT) / ROWS);
+
+let mouseX = 0;
+let mouseY = 0;
+let playerX = Math.floor(COLS / 2);
+let playerY = 0;
 
 const FILTERS = { NONE: null, NURSERY: 'NURSERY', SANCTUARY: 'SANCTUARY', RESOURCE: 'RESOURCE' };
+const VISIBILITY_RADIUS = 3;
+
+let map = [];
+
+function initMap() {
+    map = [];
+    for (let y = 0; y < ROWS; y++) {
+        map[y] = [];
+        for (let x = 0; x < COLS; x++) {
+            map[y][x] = {
+                type: 'wall',
+                nutrient: Math.floor(Math.random() * 50),
+                filter: FILTERS.NONE
+            };
+        }
+    }
+    
+    map[playerY][playerX] = {
+        type: 'ground',
+        nutrient: 0,
+        filter: FILTERS.NONE
+    };
+}
+
+initMap();
 // ===END:CONFIG===
 
 // ===SECTION:STATE===
