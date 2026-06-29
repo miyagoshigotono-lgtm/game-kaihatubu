@@ -9,10 +9,10 @@
     "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
   },
   "recent_sections": [
-    "UPDATE",
     "STATE",
     "ECOSYSTEM",
-    "RENDER"
+    "RENDER",
+    "INIT_INPUT"
   ],
   "implemented_features": [
     "[ECOSYSTEM] mutate()による遺伝子継承とcreateMonster()による魔物生成",
@@ -25,7 +25,8 @@
     "[RENDER] 地形の栄養値による色グラデーション描画",
     "[RENDER] 魔物をタイプ別色円・勇者を白四角で描画",
     "[ECOSYSTEM] createMonster関数に「外見遺伝子(appearanceCode)」を追加し、魔物のタイプごとに形状や色味を決定するロジックを実装する。具体的には、遺…",
-    "[RENDER] render()関数内に、魔物の遺伝子情報（appearance.shapeType）に基づいた描画ロジックを実装する。具体的には、shapeType 0は円、…"
+    "[RENDER] render()関数内に、魔物の遺伝子情報（appearance.shapeType）に基づいた描画ロジックを実装する。具体的には、shapeType 0は円、…",
+    "[INIT_INPUT] 魔王の操作ロジックの実装。キーボードイベントリスナーを追加し、WASDまたは十字キーで魔王（プレイヤー位置変数 playerX, playerY）を移動させ、S…"
   ],
   "failed_approaches": [
     "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",

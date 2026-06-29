@@ -125,6 +125,9 @@ function resize() {
 // ===END:ECOSYSTEM===
 
 // ===SECTION:INIT_INPUT===
+let playerX = Math.floor(COLS / 2);
+let playerY = 0;
+
 function init() {
   resize();
   game.map = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => ({ value: 0.0, filter: null })));
@@ -134,23 +137,21 @@ function init() {
   game.phase = 'dig';
   game.digsLeft = 10 + (game.round - 1) * 2;
   game.interferencePoints = 5 + game.round;
-  game.message = 'ラウンド ' + game.round + '：ダンジョンを掘り進めよ';
+  playerX = Math.floor(COLS / 2);
+  playerY = 0;
+  game.message = 'ラウンド ' + game.round + '：WASDで移動、Spaceで掘削せよ';
   updateGrid();
 }
 
-function onDig(e) {
-  if (game.phase === 'over') { game.round = 1; init(); return; }
+function onDig(x, y) {
   if (game.phase !== 'dig' || game.digsLeft <= 0) return;
-  const rect = canvas.getBoundingClientRect();
-  const cx = Math.floor((e.clientX - rect.left) / TILE);
-  const cy = Math.floor((e.clientY - rect.top) / TILE);
-  if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy].value > 0) return;
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[x][y].value > 0) return;
 
-  game.map[cx][cy].value = 3.0;
+  game.map[x][y].value = 3.0;
   game.digsLeft--;
 
   if (Math.random() < 0.8) {
-    game.monsters.push(createMonster(cx, cy, Math.random() > 0.4 ? 0 : 1));
+    game.monsters.push(createMonster(x, y, Math.random() > 0.4 ? 0 : 1));
   }
 
   if (game.digsLeft <= 0) {
@@ -160,7 +161,32 @@ function onDig(e) {
       game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 30 + game.round * 10, t: 0 });
     }
   }
+  updateGrid();
 }
+
+window.addEventListener('keydown', (e) => {
+  if (game.phase === 'over') { game.round = 1; init(); return; }
+  if (game.phase !== 'dig') return;
+
+  let dx = 0, dy = 0;
+  switch (e.key.toLowerCase()) {
+    case 'w': case 'arrowup': dy = -1; break;
+    case 's': case 'arrowdown': dy = 1; break;
+    case 'a': case 'arrowleft': dx = -1; break;
+    case 'd': case 'arrowright': dx = 1; break;
+    case ' ': case 'enter':
+      onDig(playerX, playerY);
+      return;
+  }
+
+  const nx = playerX + dx;
+  const ny = playerY + dy;
+  if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+    playerX = nx;
+    playerY = ny;
+  }
+  updateGrid();
+});
 
 function onFilter(e) {
   e.preventDefault();
@@ -173,6 +199,7 @@ function onFilter(e) {
   let currentIdx = filters.indexOf(game.map[cx][cy].filter);
   game.map[cx][cy].filter = filters[(currentIdx + 1) % filters.length];
   game.interferencePoints--;
+  updateGrid();
 }
 // ===END:INIT_INPUT===
 
