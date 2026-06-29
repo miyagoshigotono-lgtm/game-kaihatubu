@@ -313,13 +313,15 @@ function dig(x, y) {
   game.digsLeft--;
 
   const nutrient = game.map[y][x].nutrient;
-  if (Math.random() < nutrient * 0.2) {
-    const type = Math.random() < 0.3 ? 1 : 0; // 0:草食, 1:肉食
-    game.monsters.push(createMonster(x, y, type, {
+  if (Math.random() < nutrient * 0.3) {
+    const type = Math.random() < 0.3 ? 1 : 0;
+    const genes = {
       speed: 0.2 + Math.random() * 0.5,
       size: 0.1 + Math.random() * 0.4,
       reproThreshold: 50 + Math.random() * 50
-    }, 0, Date.now() + Math.random()));
+    };
+    game.monsters.push(createMonster(x, y, type, genes, 0, Math.random()));
+    addParticle(x, y, '#ffffff');
   }
 }
 
@@ -329,6 +331,16 @@ function update(dt) {
     if (p.life <= 0) game.particles.splice(i, 1);
   });
 
+  if (game.phase === 'dig') {
+    const speed = 0.15;
+    if (keys['w']) game.player.y = Math.max(0, game.player.y - speed);
+    if (keys['s']) game.player.y = Math.min(ROWS - 1, game.player.y + speed);
+    if (keys['a']) game.player.x = Math.max(0, game.player.x - speed);
+    if (keys['d']) game.player.x = Math.min(COLS - 1, game.player.x + speed);
+    
+    if (keys[' ']) dig(Math.floor(game.player.x), Math.floor(game.player.y));
+  }
+
   if (game.phase === 'battle') {
     updateGrid();
 
@@ -337,35 +349,29 @@ function update(dt) {
       m.energy -= (m.genes.speed * 0.5 + m.genes.size * 0.2) * dt;
 
       if (m.type === 1) {
-        let targets = game.grid[m.y][m.x].filter(o => o.type === 0);
+        let targets = game.grid[m.y][m.x].filter(o => o.type === 0 && o !== m);
         if (targets.length > 0) {
-          m.energy += targets[0].energy * 0.5;
-          targets[0].energy = -1;
+          m.energy += targets[0].energy * 0.6;
+          targets[0].energy = -100;
           addParticle(m.x, m.y, '#ff0000');
         }
       }
 
       m.lastMoveTime += dt;
-      if (m.lastMoveTime > (1.1 - m.genes.speed)) {
-        let neighbors = [];
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            let ny = m.y + dy, nx = m.x + dx;
-            if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && game.map[ny][nx].value === 0) {
-              neighbors.push({x: nx, y: ny});
-            }
-          }
-        }
-        if (neighbors.length > 0) {
-          let next = neighbors[Math.floor(Math.random() * neighbors.length)];
-          m.x = next.x; m.y = next.y;
+      if (m.lastMoveTime > (1.2 - m.genes.speed)) {
+        const directions = [[0,1],[0,-1],[1,0],[-1,0]];
+        const [dx, dy] = directions[Math.floor(Math.random() * 4)];
+        const nx = Math.max(0, Math.min(COLS - 1, m.x + dx));
+        const ny = Math.max(0, Math.min(ROWS - 1, m.y + dy));
+        if (game.map[ny][nx].value === 0) {
+          m.x = nx; m.y = ny;
         }
         m.lastMoveTime = 0;
       }
 
       if (m.energy > m.genes.reproThreshold) {
         m.energy /= 2;
-        game.monsters.push(createMonster(m.x, m.y, m.type, {...m.genes}, m.generation + 1, m.id));
+        game.monsters.push(createMonster(m.x, m.y, m.type, {...m.genes}, m.generation + 1, Math.random()));
         addParticle(m.x, m.y, '#ffff00');
       }
 
@@ -374,14 +380,14 @@ function update(dt) {
 
     game.heroes.forEach((h, idx) => {
       h.timer += dt;
-      if (h.timer > 0.8) {
+      if (h.timer > 1.0) {
         h.timer = 0;
         let best = {x: h.x, y: h.y, score: -1};
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
             let ny = h.y + dy, nx = h.x + dx;
             if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) {
-              let score = (game.grid[ny][nx] ? game.grid[ny][nx].length : 0) * 10 + Math.random();
+              let score = (game.grid[ny][nx] ? game.grid[ny][nx].length : 0) * 15 + Math.random();
               if (score > best.score) best = {x: nx, y: ny, score: score};
             }
           }
@@ -394,11 +400,11 @@ function update(dt) {
 
     if (game.monsters.length === 0) {
       game.phase = 'over';
-      game.message = 'ダンジョン崩壊...';
+      game.message = 'ダンジョン生態系が崩壊しました';
     } else if (game.heroes.length === 0) {
       game.round++;
       game.phase = 'dig';
-      game.digsLeft = 10 + (game.round * 2);
+      game.digsLeft = 10 + (game.round * 3);
     }
   }
 }

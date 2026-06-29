@@ -428,5 +428,15 @@
     "task": "gameオブジェクト内に『掘削履歴ログ』と『魔王のインベントリ（所持している栄養素の総量）』を管理するプロパティを追加し、掘削時に発生するイベントを記録する配列『game.eventLog = []』を定義する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-29 23:34",
+    "cycle_type": "lunch",
+    "cycle_number": 34,
+    "result": "success",
+    "target_section": "UPDATE",
+    "task": "update(dt)関数内に、魔王の移動および掘削後の「魔物生成ロジック」を実装する。具体的には、掘削によってtypeが'wall'から'ground'に変化した際、その座標にランダムな遺伝子を持つ初期個体の魔物を生成し、game.monsters配列に追加する処理を組み込む。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]
