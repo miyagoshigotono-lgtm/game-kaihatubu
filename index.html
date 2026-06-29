@@ -4,261 +4,203 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>破壊神のダンジョンメイカー — 開発室</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+    :root {
+      --ink: #2b2b3a;
+      --accent: #ff8a3d;
+      --accent-soft: rgba(255,138,61,.35);
+      --green: #54c267;
+      --muted: #9a8f7e;
+      --panel: #fffdf8;
+    }
     body {
-      background: #f8f8f8;
-      color: #1a1a1a;
-      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-      line-height: 1.6;
+      background: radial-gradient(circle at 50% -10%, #fff7ea 0%, #fdf3e3 45%, #f7e7cf 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: 'M PLUS Rounded 1c', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.65;
+      padding-bottom: 64px;
+    }
+    details summary::-webkit-details-marker { display: none; }
+
+    @keyframes bobMove { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+    @keyframes blink { 0%,92%,100%{transform:scaleY(1)} 96%{transform:scaleY(.15)} }
+    @keyframes fall { 0%{transform:translateY(-30px) rotate(0);opacity:1} 100%{transform:translateY(360px) rotate(540deg);opacity:0} }
+    @keyframes pop { 0%{transform:scale(.6);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+    @keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+    @keyframes toastIn { 0%{transform:translateY(20px) scale(.9);opacity:0} 100%{transform:translateY(0) scale(1);opacity:1} }
+    @keyframes torch { 0%,100%{opacity:.55} 50%{opacity:.9} }
+
+    /* チャンキーなボタン共通 */
+    .btn-pop {
+      font-family: inherit; cursor: pointer; border: 3px solid var(--ink);
+      border-radius: 14px; font-weight: 800; font-size: .95rem; padding: 11px 22px;
+      box-shadow: 0 5px 0 rgba(43,43,58,.25); color: var(--ink);
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: transform .06s, box-shadow .06s;
+    }
+    .btn-pop:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(43,43,58,.25); }
+    .btn-pop:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-orange { background: var(--accent); }
+    .btn-green  { background: var(--green); }
+    .btn-white  { background: #fff; }
+
+    .chip {
+      font-family: inherit; cursor: pointer; background: #fff; border: 2.5px solid var(--ink);
+      border-radius: 999px; padding: 6px 14px; font-size: .82rem; font-weight: 700;
+      box-shadow: 0 3px 0 rgba(43,43,58,.12); transition: transform .06s, box-shadow .06s;
+    }
+    .chip:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(43,43,58,.12); }
+
+    .pill {
+      background: #fff; border: 2.5px solid var(--ink); border-radius: 999px;
+      padding: 4px 12px; font-size: .78rem; font-weight: 700;
+      box-shadow: 0 3px 0 rgba(43,43,58,.12); white-space: nowrap;
     }
 
-    /* ===== ヘッダー ===== */
-    .header {
-      background: #fff;
-      border-bottom: 1px solid #e8e8e8;
-      padding: 16px 24px;
-      display: flex;
-      align-items: baseline;
-      gap: 16px;
+    textarea.intent-area {
+      width: 100%; min-height: 96px; resize: vertical; font-family: inherit;
+      font-size: .95rem; font-weight: 500; line-height: 1.6; border: 3px solid var(--ink);
+      border-radius: 14px; padding: 12px 14px; background: #fff; color: var(--ink); outline: none;
     }
-    .header h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
-    .header .subtitle { font-size: 0.82rem; color: #888; }
+    textarea.intent-area:focus { box-shadow: 0 0 0 4px var(--accent-soft); }
 
-    /* ===== メインレイアウト ===== */
-    .main { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; }
+    .sec-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .sec-title b { font-size: 1.05rem; font-weight: 800; }
+    .sec-title span { font-size: .76rem; font-weight: 500; color: var(--muted); }
 
-    /* ===== ゲームプレビュー ===== */
-    .game-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-bottom: 36px;
-    }
-    .game-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #999;
-      margin-bottom: 10px;
-    }
-    .game-frame {
-      width: 100%;
-      max-width: 800px;
-      aspect-ratio: 20 / 14;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-      background: #0a0a0a;
-    }
-    .game-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .link-quiet { color: var(--muted); font-weight: 700; font-size: .78rem; text-decoration: none; border-bottom: 2px solid var(--accent-soft); }
+    .link-quiet:hover { color: var(--accent); }
 
-    /* ===== ワークフロー操作 ===== */
-    .controls {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-top: 14px;
-    }
-    .btn {
-      padding: 8px 22px;
-      font-size: 0.88rem;
-      font-family: inherit;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      background: #fff;
-      color: #333;
-      cursor: pointer;
-      transition: background 0.12s, border-color 0.12s;
-    }
-    .btn:hover { background: #f0f0f0; border-color: #aaa; }
-    .btn:active { background: #e8e8e8; }
-    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .status-msg {
-      text-align: center;
-      font-size: 0.82rem;
-      margin-top: 8px;
-      min-height: 1.4em;
-      color: #555;
-    }
-    .status-msg.ok { color: #2a9d5c; }
-    .status-msg.ng { color: #d94f4f; }
-    .hint {
-      text-align: center;
-      font-size: 0.75rem;
-      color: #aaa;
-      margin-top: 5px;
-    }
-
-    /* ===== セクション共通 ===== */
-    .section { margin-bottom: 36px; }
-    .section-title {
-      font-size: 0.78rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #999;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #ececec;
-    }
-
-    /* ===== オーナーの意図 ===== */
-    .intent-box {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      padding: 16px;
-    }
-    .intent-current {
-      font-size: 0.92rem;
-      color: #1a1a1a;
-      line-height: 1.7;
-      white-space: pre-wrap;
-      word-break: break-word;
-      margin-bottom: 12px;
-      min-height: 2.5em;
-    }
-    .intent-current.empty { color: #bbb; font-style: italic; }
-    .intent-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .intent-note { font-size: 0.76rem; color: #aaa; }
-    .btn-edit {
-      padding: 6px 16px;
-      font-size: 0.82rem;
-      background: #1a1a1a;
-      color: #fff;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-block;
-      transition: background 0.12s;
-    }
-    .btn-edit:hover { background: #333; }
-
-    /* ===== 開発ログ ===== */
-    .log-list { display: flex; flex-direction: column; gap: 8px; }
-    .log-entry {
-      background: #fff;
-      border: 1px solid #e8e8e8;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .log-entry summary {
-      list-style: none;
-      cursor: pointer;
-      padding: 11px 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.88rem;
-      user-select: none;
-    }
-    .log-entry summary::-webkit-details-marker { display: none; }
-    .log-entry summary:hover { background: #fafafa; }
-    .log-entry[open] summary { border-bottom: 1px solid #f0f0f0; }
-
-    .badge {
-      font-size: 0.7rem;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .badge-morning { background: #fff3e0; color: #e07000; border: 1px solid #f0c070; }
-    .badge-lunch   { background: #e8f5e9; color: #2a7d45; border: 1px solid #8bc99e; }
-    .badge-ok  { background: #e8f5e9; color: #2a7d45; border: 1px solid #8bc99e; }
-    .badge-ng  { background: #fdecea; color: #c0392b; border: 1px solid #e9a8a2; }
-
-    .log-section-tag {
-      font-size: 0.72rem;
-      padding: 2px 7px;
-      border-radius: 4px;
-      background: #f0f0f0;
-      color: #555;
-      font-weight: 600;
-    }
-    .log-task {
-      flex: 1;
-      color: #444;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .log-ts { font-size: 0.75rem; color: #bbb; margin-left: auto; white-space: nowrap; }
-
-    .log-body {
-      padding: 12px 14px;
-      font-size: 0.82rem;
-      color: #555;
-      line-height: 1.7;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .empty-state { text-align: center; color: #bbb; font-size: 0.88rem; padding: 24px; }
+    .status-line { text-align: center; font-size: .82rem; font-weight: 700; min-height: 1.3em; margin-top: 10px; }
+    .status-line.ok { color: var(--green); }
+    .status-line.ng { color: #d24b4b; }
   </style>
 </head>
 <body>
-  <header class="header">
-    <h1>破壊神のダンジョンメイカー</h1>
-    <span class="subtitle" id="lastUpdated">読み込み中…</span>
+
+  <!-- ===== HEADER ===== -->
+  <header style="position:sticky;top:0;z-index:40;background:#fffdf8;border-bottom:3px solid #2b2b3a;box-shadow:0 4px 0 rgba(43,43,58,.08);">
+    <div style="max-width:980px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div style="width:46px;height:46px;border-radius:14px;border:3px solid #2b2b3a;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 rgba(43,43,58,.2);font-size:24px;flex-shrink:0;">🏰</div>
+      <div style="flex:1;min-width:160px;">
+        <div style="font-size:1.18rem;font-weight:800;letter-spacing:.01em;line-height:1.2;">破壊神のダンジョンメイカー</div>
+        <div style="font-size:.74rem;font-weight:500;color:#9a8f7e;">まいにち自動で育つ ゲーム開発室</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="headerPills">
+        <div class="pill">サイクル <b style="color:var(--accent)" id="pillCycle">–</b></div>
+        <div class="pill">成功 <b style="color:#54c267" id="pillSuccess">–</b></div>
+        <div class="pill" id="pillUpdated">読み込み中…</div>
+      </div>
+    </div>
   </header>
 
-  <div class="main">
+  <div style="max-width:980px;margin:0 auto;padding:26px 20px 0;display:flex;flex-direction:column;gap:30px;">
 
-    <!-- ゲームプレビュー -->
-    <div class="game-wrap">
-      <div class="game-label">Game Preview</div>
-      <div class="game-frame">
-        <iframe id="gameFrame" src="game.html" title="破壊神のダンジョンメイカー"></iframe>
-      </div>
-      <div class="controls">
-        <button class="btn" id="btnMorning" onclick="dispatchWorkflow('morning.yml')">朝礼を手動実行</button>
-        <button class="btn" id="btnLunch" onclick="dispatchWorkflow('lunch.yml')">ランチを手動実行</button>
-        <button class="btn" onclick="reloadGame()">ゲームをリロード</button>
-      </div>
-      <div class="status-msg" id="statusMsg"></div>
-      <div class="hint">
-        手動実行にはGitHub Personal Access Token が必要です（Classic PAT: <b>workflow</b> スコープ）。
-        <span id="tokenState"></span>
-        &nbsp;·&nbsp;<a href="#" onclick="resetToken(); return false;" style="color:#aaa;font-size:0.75rem;">トークンをリセット</a>
-      </div>
-    </div>
-
-    <!-- オーナーの意図 -->
-    <div class="section">
-      <div class="section-title">オーナーの開発意図</div>
-      <div class="intent-box">
-        <div class="intent-current" id="intentText">読み込み中…</div>
-        <div class="intent-actions">
-          <a class="btn-edit"
-             href="https://github.com/miyagoshigotono-lgtm/game-kaihatubu/edit/main/user_intent.json"
-             target="_blank" rel="noopener">
-            GitHubで意図を編集する →
-          </a>
-          <span class="intent-note">変更は次のサイクルからAIに自動反映されます</span>
+    <!-- ===== GAME PREVIEW ===== -->
+    <section>
+      <div class="sec-title"><b>🎮 いまのゲーム</b><span>枠いっぱいにフィットするよ</span></div>
+      <div style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:22px;padding:14px;box-shadow:0 6px 0 rgba(43,43,58,.15);">
+        <div style="position:relative;width:100%;aspect-ratio:16/10;border-radius:14px;overflow:hidden;border:3px solid #2b2b3a;background:#0d0b16;">
+          <iframe id="gameFrame" src="game.html" title="破壊神のダンジョンメイカー"
+                  style="position:absolute;inset:0;width:100%;height:100%;border:0;display:block;"></iframe>
         </div>
       </div>
-    </div>
-
-    <!-- 開発ログ -->
-    <div class="section">
-      <div class="section-title">開発ログ <span id="logCount" style="font-weight:400;color:#bbb"></span></div>
-      <div class="log-list" id="logList">
-        <div class="empty-state">読み込み中…</div>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
+        <button class="btn-pop btn-orange" id="btnMorning" onclick="dispatchWorkflow('morning.yml')">☀️ 朝礼を見る</button>
+        <button class="btn-pop btn-green" id="btnLunch" onclick="dispatchWorkflow('lunch.yml')">🍱 ランチを見る</button>
+        <button class="btn-pop btn-white" onclick="reloadGame()">🔄 リロード</button>
       </div>
-    </div>
+      <div class="status-line" id="statusMsg"></div>
+      <div style="text-align:center;font-size:.72rem;color:#b3a890;font-weight:500;margin-top:4px;">
+        手動実行にはGitHubトークン（classic PATの <b>repo</b> スコープ推奨）が必要です。
+        <a href="#" class="link-quiet" onclick="resetToken();return false;">トークンをリセット</a>
+        <span id="tokenState"></span>
+      </div>
+    </section>
 
+    <!-- ===== 会議室ステージ ===== -->
+    <section>
+      <div class="sec-title"><b>👀 開発のようす</b><span id="stageHint">最新サイクルのもよう</span></div>
+      <div style="position:relative;background:linear-gradient(180deg,#cfe8ff 0%,#e7f4ff 55%,#d8c4a0 55%, #c9b08a 100%);border:3px solid #2b2b3a;border-radius:22px;box-shadow:0 6px 0 rgba(43,43,58,.15);overflow:hidden;">
+        <div style="position:relative;width:100%;height:0;padding-bottom:46%;min-height:300px;">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:760px;height:340px;">
+
+            <!-- 窓 -->
+            <div style="position:absolute;left:36px;top:30px;width:90px;height:70px;border:3px solid #2b2b3a;border-radius:8px;background:linear-gradient(180deg,#bfe3ff,#8fc9ff);box-shadow:inset 0 0 0 6px #fffdf8;"></div>
+            <div style="position:absolute;right:36px;top:30px;width:90px;height:70px;border:3px solid #2b2b3a;border-radius:8px;background:linear-gradient(180deg,#bfe3ff,#8fc9ff);box-shadow:inset 0 0 0 6px #fffdf8;"></div>
+
+            <!-- ホワイトボード -->
+            <div style="position:absolute;left:50%;top:14px;transform:translateX(-50%);width:300px;background:#fffdf8;border:3px solid #2b2b3a;border-radius:14px;padding:10px 14px;box-shadow:0 5px 0 rgba(43,43,58,.18);text-align:center;z-index:5;">
+              <div id="boardKicker" style="font-size:.66rem;font-weight:800;letter-spacing:.12em;color:#c79a4e;">本日の議題</div>
+              <div id="boardTitle" style="font-size:.92rem;font-weight:800;line-height:1.35;margin-top:2px;">読み込み中…</div>
+            </div>
+
+            <!-- テーブル -->
+            <div style="position:absolute;left:50%;bottom:46px;transform:translateX(-50%);width:380px;height:96px;border-radius:50%;background:#a9743f;border:3px solid #2b2b3a;box-shadow:0 10px 0 #7c531f, 0 12px 0 rgba(43,43,58,.2);z-index:2;"></div>
+            <div style="position:absolute;left:50%;bottom:64px;transform:translateX(-50%);width:300px;height:54px;border-radius:50%;background:#c08a4e;border:2px solid #2b2b3a;z-index:2;"></div>
+
+            <!-- 空室プロンプト -->
+            <div id="roomEmpty" style="position:absolute;left:50%;top:150px;transform:translateX(-50%);text-align:center;z-index:6;animation:floatY 3s ease-in-out infinite;display:none;">
+              <div style="font-size:46px;">🪑💤</div>
+              <div style="background:#fffdf8;border:2.5px solid #2b2b3a;border-radius:999px;padding:5px 16px;font-size:.82rem;font-weight:700;box-shadow:0 4px 0 rgba(43,43,58,.15);margin-top:6px;">上のボタンを押すと みんな集まってくるよ！</div>
+            </div>
+
+            <!-- エージェント（司令塔・プログラマー・QA） -->
+            <div id="agents"></div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 意図フォーム ===== -->
+    <section>
+      <div class="sec-title"><b>✏️ AIにおねがいする</b><span>書いて送るだけ。次の朝礼でAIが反映するよ</span></div>
+      <div style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:22px;padding:18px;box-shadow:0 6px 0 rgba(43,43,58,.15);">
+        <div style="background:#fff6e9;border:2px dashed #e0b878;border-radius:14px;padding:12px 14px;margin-bottom:16px;">
+          <div style="font-size:.68rem;font-weight:800;letter-spacing:.1em;color:#c79a4e;margin-bottom:4px;">いまのおねがい</div>
+          <div id="intentCurrent" style="font-size:.92rem;font-weight:500;line-height:1.6;">読み込み中…</div>
+        </div>
+
+        <div id="chipRow" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
+
+        <textarea id="intentDraft" class="intent-area" placeholder="例）魔物をもっと可愛くしてほしい。ボス戦を派手にしてほしい。"></textarea>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap;">
+          <span style="font-size:.74rem;font-weight:500;color:#9a8f7e;">
+            むずかしい言葉はいりません。やってほしいことを そのまま書いてね。
+            <a href="https://github.com/miyagoshigotono-lgtm/game-kaihatubu/edit/main/user_intent.json" target="_blank" rel="noopener" class="link-quiet">GitHubで直接編集</a>
+          </span>
+          <button class="btn-pop" id="btnSend" style="background:var(--accent);color:#fff;font-size:1rem;padding:11px 28px;" onclick="sendIntent()">📨 エージェントに送る</button>
+        </div>
+        <div class="status-line" id="intentStatus"></div>
+      </div>
+    </section>
+
+    <!-- ===== 開発ログ ===== -->
+    <section>
+      <div class="sec-title"><b>📜 これまでの開発ログ</b><span id="logCount"></span></div>
+      <div style="display:flex;flex-direction:column;gap:10px;" id="logList">
+        <div style="text-align:center;color:#b3a890;font-weight:500;padding:20px;">読み込み中…</div>
+      </div>
+    </section>
+
+    <div style="text-align:center;font-size:.74rem;color:#b3a890;font-weight:500;padding-top:6px;">
+      毎時 0分に朝礼・30分にランチが自動で開かれ、ゲームが少しずつ育ちます。
+    </div>
+  </div>
+
+  <!-- toast -->
+  <div id="toast" style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:90;display:none;">
+    <div style="background:#2b2b3a;color:#fffdf8;border-radius:16px;padding:14px 22px;font-weight:800;font-size:.95rem;box-shadow:0 8px 24px rgba(43,43,58,.4);animation:toastIn .4s ease both;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:1.3rem;">📨</span><span id="toastText">エージェントに伝えました！</span>
+    </div>
   </div>
 
   <script>
@@ -266,17 +208,50 @@
     const REPO_NAME  = 'game-kaihatubu';
     const REPO_REF   = 'main';
 
-    // ===== ワークフロー手動実行 =====
+    // ===== ユーティリティ =====
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    // ログのtimestampは既にJST（YYYY-MM-DD HH:mm）で記録されているため、
+    // タイムゾーン変換はせず「MM/DD HH:mm」へ整形するだけにする。
+    function toJST(ts) {
+      if (!ts) return '';
+      const m = String(ts).match(/^\d{4}-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+      if (!m) return ts;
+      return `${m[1]}/${m[2]} ${m[3]}:${m[4]}`;
+    }
+    function todayJST() {
+      const d = new Date(Date.now() + 9*60*60*1000);
+      const p = n => String(n).padStart(2,'0');
+      return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`;
+    }
+    async function fetchJson(path) {
+      const res = await fetch(path + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) throw new Error(`${path} の取得に失敗（${res.status}）`);
+      return res.json();
+    }
+    const SECTION_JP = { CONFIG:'設定', STATE:'状態', ECOSYSTEM:'生態系', INIT_INPUT:'入力', UPDATE:'更新処理', RENDER:'描画' };
+
+    // ===== トースト =====
+    let toastTimer = null;
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      if (msg) document.getElementById('toastText').textContent = msg;
+      t.style.display = 'block';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    // ===== トークン管理 =====
     const statusEl = document.getElementById('statusMsg');
     function setStatus(msg, kind) {
-      statusEl.textContent = msg;
-      statusEl.className = 'status-msg' + (kind ? ' ' + kind : '');
+      statusEl.textContent = msg || '';
+      statusEl.className = 'status-line' + (kind ? ' ' + kind : '');
     }
     function updateTokenState() {
       const el = document.getElementById('tokenState');
-      if (!el) return;
       const t = localStorage.getItem('gh_pat');
-      el.textContent = t ? `（保存済: ${t.slice(0, 4)}…${t.slice(-4)}）` : '（未設定）';
+      el.textContent = t ? `（保存済: ${t.slice(0,4)}…${t.slice(-4)}）` : '（未設定）';
     }
     function resetToken() {
       localStorage.removeItem('gh_pat');
@@ -286,14 +261,13 @@
     function getOrAskToken() {
       let t = localStorage.getItem('gh_pat');
       if (!t) {
-        t = prompt('GitHub Personal Access Token を入力してください\n\n■ Classic PAT（推奨）\n  Settings → Developer settings → Personal access tokens → Tokens (classic)\n  スコープ: 「workflow」にチェック\n\n■ Fine-grained PAT\n  Repository permissions → Actions → Read and write');
-        if (t) {
-          localStorage.setItem('gh_pat', t.trim());
-          updateTokenState();
-        }
+        t = prompt('GitHub Personal Access Token を入力してください\n\n■ Classic PAT（推奨）\n  Settings → Developer settings → Tokens (classic)\n  スコープ:「repo」にチェック（朝礼/ランチの実行と、おねがいの保存の両方に必要）');
+        if (t) { localStorage.setItem('gh_pat', t.trim()); updateTokenState(); }
       }
       return t ? t.trim() : '';
     }
+
+    // ===== ワークフロー手動実行 =====
     async function dispatchWorkflow(file) {
       const token = getOrAskToken();
       if (!token) { setStatus('トークンが未入力のため中止しました。', 'ng'); return; }
@@ -303,28 +277,17 @@
       try {
         const res = await fetch(
           `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${file}/dispatches`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/vnd.github+json',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ ref: REPO_REF })
-          }
+          { method:'POST', headers:{ 'Authorization':`Bearer ${token}`, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' },
+            body: JSON.stringify({ ref: REPO_REF }) }
         );
         if (res.status === 204) {
-          setStatus('実行を開始しました。数分後にこのページをリロードしてください。', 'ok');
+          setStatus('会議を始めました！数分後にリロードすると結果が反映されます。', 'ok');
+          showToast(file.includes('morning') ? '☀️ 朝礼を始めました！' : '🍱 ランチを始めました！');
         } else if (res.status === 401) {
-          localStorage.removeItem('gh_pat');
-          updateTokenState();
-          setStatus('認証失敗（401）— トークンが無効か期限切れです。「トークンをリセット」して再入力してください。', 'ng');
+          localStorage.removeItem('gh_pat'); updateTokenState();
+          setStatus('認証失敗（401）— トークンが無効か期限切れです。リセットして再入力してください。', 'ng');
         } else if (res.status === 403) {
-          setStatus('権限不足（403）— Classic PAT は「workflow」スコープ、Fine-grained PAT は「Actions: Read and write」が必要です。トークンをリセットして再発行してください。', 'ng');
-        } else if (res.status === 422) {
-          let detail = '';
-          try { detail = (await res.json()).message || ''; } catch (e) {}
-          setStatus(`実行失敗（422）— ワークフローファイルが見つからないか workflow_dispatch トリガーが未設定の可能性。${detail ? ' 詳細: ' + detail : ''}`, 'ng');
+          setStatus('権限不足（403）— Classic PAT は「repo」スコープが必要です。リセットして再発行してください。', 'ng');
         } else {
           let detail = '';
           try { detail = (await res.json()).message || ''; } catch (e) {}
@@ -342,116 +305,214 @@
       f.src = f.src;
     }
 
-    // ===== データ取得 =====
-    async function fetchJson(path) {
-      const res = await fetch(path + '?t=' + Date.now(), { cache: 'no-store' });
-      if (!res.ok) throw new Error(`${path} の取得に失敗しました（${res.status}）`);
-      return res.json();
+    // ===== おねがい（user_intent.json）をAPIでコミット =====
+    function setIntentStatus(msg, kind) {
+      const el = document.getElementById('intentStatus');
+      el.textContent = msg || '';
+      el.className = 'status-line' + (kind ? ' ' + kind : '');
+    }
+    function b64encodeUtf8(str) { return btoa(unescape(encodeURIComponent(str))); }
+    function b64decodeUtf8(b64) { return decodeURIComponent(escape(atob(b64.replace(/\n/g,'')))); }
+
+    async function sendIntent() {
+      const text = document.getElementById('intentDraft').value.trim();
+      if (!text) { setIntentStatus('おねがいを入力してください。', 'ng'); return; }
+      const token = getOrAskToken();
+      if (!token) { setIntentStatus('トークンが未入力のため中止しました。', 'ng'); return; }
+      const btn = document.getElementById('btnSend');
+      btn.disabled = true;
+      setIntentStatus('送信中…');
+      const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/user_intent.json`;
+      const headers = { 'Authorization':`Bearer ${token}`, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' };
+      try {
+        // 現在のファイルとSHAを取得
+        let sha = null, existing = {};
+        const getRes = await fetch(`${apiUrl}?ref=${REPO_REF}&t=${Date.now()}`, { headers, cache:'no-store' });
+        if (getRes.ok) {
+          const j = await getRes.json();
+          sha = j.sha;
+          try { existing = JSON.parse(b64decodeUtf8(j.content)); } catch (e) { existing = {}; }
+        }
+        const payload = Object.assign({}, existing, { intent: text, updated: todayJST() });
+        const newContent = JSON.stringify(payload, null, 2) + '\n';
+        const body = { message: 'おねがいを更新（開発室UIから）', content: b64encodeUtf8(newContent), branch: REPO_REF };
+        if (sha) body.sha = sha;
+        const putRes = await fetch(apiUrl, { method:'PUT', headers, body: JSON.stringify(body) });
+        if (putRes.ok) {
+          setIntentStatus('', '');
+          document.getElementById('intentCurrent').textContent = text;
+          showToast('📨 おねがいを送りました！次の朝礼で反映されます');
+        } else if (putRes.status === 401) {
+          localStorage.removeItem('gh_pat'); updateTokenState();
+          setIntentStatus('認証失敗（401）— トークンをリセットして再入力してください。', 'ng');
+        } else if (putRes.status === 403 || putRes.status === 404) {
+          setIntentStatus('権限不足（403/404）— Classic PAT に「repo」スコープが必要です。上の「GitHubで直接編集」からでも保存できます。', 'ng');
+        } else if (putRes.status === 409) {
+          setIntentStatus('競合（409）— 直前に更新されました。もう一度送ってください。', 'ng');
+        } else {
+          let detail = '';
+          try { detail = (await putRes.json()).message || ''; } catch (e) {}
+          setIntentStatus(`保存失敗（HTTP ${putRes.status}）${detail ? ': ' + detail : ''}`, 'ng');
+        }
+      } catch (e) {
+        setIntentStatus('ネットワークエラー: ' + e.message, 'ng');
+      } finally {
+        btn.disabled = false;
+      }
     }
 
-    function esc(s) {
-      return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
-    // UTC文字列 "YYYY-MM-DD HH:mm" → 日本時間表示
-    function toJST(ts) {
-      if (!ts) return '';
-      const d = new Date(String(ts).replace(' ', 'T') + ':00Z');
-      if (isNaN(d.getTime())) return ts;
-      return d.toLocaleString('ja-JP', {
-        timeZone: 'Asia/Tokyo',
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit'
+    // ===== おねがいチップ =====
+    const CHIPS = [
+      'もっと可愛く', 'ボス戦を派手に', '魔物に個性を', 'エフェクトを豪華に',
+      '色をカラフルに', '音が鳴るように', '勇者を強く', 'UIを見やすく'
+    ];
+    function renderChips() {
+      const row = document.getElementById('chipRow');
+      row.innerHTML = CHIPS.map(c => `<button class="chip" data-chip="${esc(c)}">＋ ${esc(c)}</button>`).join('');
+      row.querySelectorAll('button').forEach(b => {
+        b.onclick = () => {
+          const ta = document.getElementById('intentDraft');
+          const add = b.getAttribute('data-chip') + 'してほしい。';
+          ta.value = (ta.value.trim() ? ta.value.trim() + ' ' : '') + add;
+          ta.focus();
+        };
       });
     }
 
     // ===== 意図の表示 =====
     function renderIntent(data) {
-      const el = document.getElementById('intentText');
       const text = (data && data.intent) ? String(data.intent).trim() : '';
+      const cur = document.getElementById('intentCurrent');
+      const draft = document.getElementById('intentDraft');
       if (text) {
-        el.textContent = text;
-        el.classList.remove('empty');
+        cur.textContent = text;
+        if (!draft.value) draft.value = text;
       } else {
-        el.textContent = 'まだ意図が設定されていません。右の「GitHubで意図を編集する」から設定してください。';
-        el.classList.add('empty');
+        cur.textContent = 'まだ設定されていません。下に書いて送ってみよう！';
+        cur.style.color = '#b3a890';
       }
     }
 
-    // ===== ログの表示 =====
+    // ===== ヘッダーのピル =====
+    function renderHeader(logs) {
+      const success = logs.filter(l => l.result === 'success').length;
+      document.getElementById('pillCycle').textContent = logs.length || 0;
+      document.getElementById('pillSuccess').textContent = success;
+      const last = logs[logs.length - 1];
+      document.getElementById('pillUpdated').textContent = last ? `${toJST(last.timestamp)} 更新` : '更新なし';
+    }
+
+    // ===== 会議室ステージ =====
+    function renderStage(logs) {
+      const agentsEl = document.getElementById('agents');
+      const emptyEl = document.getElementById('roomEmpty');
+      const kicker = document.getElementById('boardKicker');
+      const title = document.getElementById('boardTitle');
+
+      if (!logs.length) {
+        emptyEl.style.display = 'block';
+        agentsEl.innerHTML = '';
+        kicker.textContent = '会議室';
+        title.textContent = 'まだ会議は開かれていません';
+        document.getElementById('stageHint').textContent = 'ボタンを押すと会議が始まるよ';
+        return;
+      }
+      emptyEl.style.display = 'none';
+      const last = logs[logs.length - 1];
+      const sec = SECTION_JP[last.target_section] || last.target_section || '？';
+      const isOk = last.result === 'success';
+      const typeLabel = last.cycle_type === 'morning' ? '朝礼' : 'ランチ';
+      const typeIcon  = last.cycle_type === 'morning' ? '☀️' : '🍱';
+
+      kicker.textContent = `${typeIcon} ${typeLabel}の議題`;
+      title.textContent = `「${sec}」を改善する`;
+      document.getElementById('stageHint').textContent = `最新：${toJST(last.timestamp)} の${typeLabel}`;
+
+      const taskShort = (last.task || '').slice(0, 24) || 'コードを書いたよ';
+      const agents = [
+        { name:'司令塔', color:'#ff8a3d', left:120, top:140, line:`今回は「${sec}」を直そう！`, z:5 },
+        { name:'プログラマー', color:'#3aa0ff', left:332, top:96, line:`${taskShort}…`, z:4 },
+        { name:'QA', color: isOk ? '#54c267' : '#e2566a', left:544, top:140,
+          line: isOk ? 'OK！合格だよ✨' : 'ここを直して！', z:5 }
+      ];
+
+      agentsEl.innerHTML = agents.map((ag, i) => `
+        <div style="position:absolute;left:${ag.left}px;top:${ag.top}px;width:96px;z-index:${ag.z};">
+          <div style="position:absolute;left:50%;bottom:104px;transform:translateX(-50%);width:190px;background:#fffdf8;border:3px solid #2b2b3a;border-radius:14px;padding:8px 12px;font-size:.78rem;font-weight:700;line-height:1.4;box-shadow:0 5px 0 rgba(43,43,58,.18);text-align:center;animation:pop .35s ease both;animation-delay:${i*0.12}s;z-index:20;">
+            ${esc(ag.line)}
+            <div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:11px solid #2b2b3a;"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:5px;animation:bobMove 1.6s ease-in-out infinite;animation-delay:${i*0.2}s;">
+            <div style="position:relative;width:62px;height:60px;background:${ag.color};border:3px solid #2b2b3a;border-radius:20px;box-shadow:0 5px 0 rgba(43,43,58,.18);">
+              <div style="position:absolute;left:50%;top:-9px;transform:translateX(-50%);width:30px;height:13px;background:${ag.color};border:3px solid #2b2b3a;border-bottom:none;border-radius:14px 14px 0 0;"></div>
+              <div style="position:absolute;left:11px;top:20px;width:14px;height:14px;background:#fffdf8;border:2px solid #2b2b3a;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:blink 4s infinite;"><div style="width:5px;height:5px;background:#2b2b3a;border-radius:50%;"></div></div>
+              <div style="position:absolute;right:11px;top:20px;width:14px;height:14px;background:#fffdf8;border:2px solid #2b2b3a;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:blink 4s infinite;"><div style="width:5px;height:5px;background:#2b2b3a;border-radius:50%;"></div></div>
+              <div style="position:absolute;left:50%;top:40px;transform:translateX(-50%);width:14px;height:7px;border:2px solid #2b2b3a;border-top:none;border-radius:0 0 10px 10px;"></div>
+            </div>
+            <div style="background:#fffdf8;border:2px solid #2b2b3a;border-radius:999px;padding:1px 9px;font-size:.7rem;font-weight:800;box-shadow:0 3px 0 rgba(43,43,58,.14);white-space:nowrap;">${esc(ag.name)}</div>
+          </div>
+        </div>`).join('');
+    }
+
+    // ===== 開発ログ =====
     function renderLogs(logs) {
       const el = document.getElementById('logList');
       const countEl = document.getElementById('logCount');
-      if (!Array.isArray(logs) || logs.length === 0) {
-        el.innerHTML = '<div class="empty-state">まだログがありません。</div>';
-        countEl.textContent = '';
+      if (!logs.length) {
+        el.innerHTML = '<div style="text-align:center;color:#b3a890;font-weight:500;padding:20px;">まだログがありません。</div>';
         return;
       }
-
       countEl.textContent = `（${logs.length}件）`;
       const sorted = logs.slice().reverse();
-
       el.innerHTML = sorted.map(l => {
         const isOk = l.result === 'success';
-        const typeBadge = l.cycle_type === 'morning'
-          ? '<span class="badge badge-morning">朝礼</span>'
-          : '<span class="badge badge-lunch">ランチ</span>';
-        const resultBadge = isOk
-          ? '<span class="badge badge-ok">成功</span>'
-          : '<span class="badge badge-ng">失敗</span>';
-        const sectionTag = l.target_section
-          ? `<span class="log-section-tag">${esc(l.target_section)}</span>`
-          : '';
-        const taskText = esc(l.task || l.priority || l.changes || '（詳細なし）');
+        const typeLabel = l.cycle_type === 'morning' ? '朝礼' : 'ランチ';
+        const icon = l.cycle_type === 'morning' ? '☀️' : '🍱';
+        const typeBg = l.cycle_type === 'morning' ? '#ffe2c4' : '#d6f0d8';
+        const resBg = isOk ? '#d6f0d8' : '#ffd9d6';
+        const resLabel = isOk ? '成功' : '失敗';
+        const sec = SECTION_JP[l.target_section] ? `${SECTION_JP[l.target_section]}（${l.target_section}）` : (l.target_section || '');
+        const task = esc(l.task || l.priority || l.changes || '（詳細なし）');
         const ts = esc(toJST(l.timestamp));
-
         const bodyLines = [];
-        if (l.task)    bodyLines.push(`タスク: ${l.task}`);
-        if (l.changes && l.changes !== l.task) bodyLines.push(`実装内容: ${l.changes}`);
+        if (sec) bodyLines.push(`対象: ${sec}`);
+        if (l.task) bodyLines.push(`おねがい/タスク: ${l.task}`);
+        if (l.changes && l.changes !== l.task) bodyLines.push(`実装: ${l.changes}`);
         if (l.qa_note) bodyLines.push(`QA: ${l.qa_note}`);
-        if (l.retry_count > 0) bodyLines.push(`リトライ: ${l.retry_count}回`);
-        const bodyHtml = bodyLines.map(line => esc(line)).join('\n');
-
+        if (l.retry_count) bodyLines.push(`リトライ: ${l.retry_count}回`);
+        const body = esc(bodyLines.join('\n'));
         return `
-<details class="log-entry">
-  <summary>
-    ${typeBadge}
-    ${resultBadge}
-    ${sectionTag}
-    <span class="log-task">${taskText}</span>
-    <span class="log-ts">${ts}</span>
-  </summary>
-  <div class="log-body">${bodyHtml}</div>
-</details>`;
+        <details style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:16px;overflow:hidden;box-shadow:0 4px 0 rgba(43,43,58,.12);">
+          <summary style="list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:9px;font-size:.9rem;font-weight:700;">
+            <span style="font-size:1.1rem;">${icon}</span>
+            <span style="font-size:.72rem;padding:2px 10px;border-radius:999px;font-weight:800;border:2px solid #2b2b3a;background:${typeBg};">${typeLabel}</span>
+            <span style="font-size:.72rem;padding:2px 10px;border-radius:999px;font-weight:800;border:2px solid #2b2b3a;background:${resBg};">${resLabel}</span>
+            <span style="flex:1;color:#4a4458;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${task}</span>
+            <span style="font-size:.74rem;color:#b3a890;white-space:nowrap;font-weight:500;">${ts}</span>
+          </summary>
+          <div style="padding:12px 16px;font-size:.84rem;color:#5a5468;line-height:1.7;white-space:pre-wrap;border-top:2px solid #f0e6d4;font-weight:500;">${body}</div>
+        </details>`;
       }).join('');
-    }
-
-    // ===== 最終更新日時の表示 =====
-    function renderLastUpdated(logs) {
-      const el = document.getElementById('lastUpdated');
-      if (!Array.isArray(logs) || logs.length === 0) { el.textContent = ''; return; }
-      const last = logs[logs.length - 1];
-      const successLogs = logs.filter(l => l.result === 'success');
-      el.textContent = `最終更新: ${toJST(last.timestamp) || '—'} (JST) ／ 成功: ${successLogs.length}件 ／ 合計: ${logs.length}件`;
     }
 
     // ===== 初期ロード =====
     (async function init() {
       updateTokenState();
+      renderChips();
       try {
         const intent = await fetchJson('user_intent.json');
         renderIntent(intent);
-      } catch (e) {
-        renderIntent(null);
-      }
+      } catch (e) { renderIntent(null); }
       try {
         const logs = await fetchJson('logs.json');
-        renderLogs(logs);
-        renderLastUpdated(logs);
+        const arr = Array.isArray(logs) ? logs : [];
+        renderHeader(arr);
+        renderStage(arr);
+        renderLogs(arr);
       } catch (e) {
         document.getElementById('logList').innerHTML =
-          `<div class="empty-state">${esc(e.message)}</div>`;
+          `<div style="text-align:center;color:#d24b4b;font-weight:600;padding:20px;">${esc(e.message)}</div>`;
+        renderStage([]);
       }
     })();
   </script>
