@@ -8,7 +8,9 @@
     "UPDATE": "update(dt)。毎フレームの魔物移動・捕食・繁殖・勇者AI侵攻・攻撃・勝敗判定。",
     "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
   },
-  "recent_sections": [],
+  "recent_sections": [
+    "RENDER"
+  ],
   "implemented_features": [
     "[ECOSYSTEM] mutate()による遺伝子継承とcreateMonster()による魔物生成",
     "[ECOSYSTEM] 捕食者(type1)と被食者(type0)の2タイプ・エネルギー捕食",
@@ -20,7 +22,9 @@
     "[RENDER] 地形の栄養値による色グラデーション描画",
     "[RENDER] 魔物をタイプ別色円・勇者を白四角で描画"
   ],
-  "failed_approaches": [],
+  "failed_approaches": [
+    "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…"
+  ],
   "current_cycle": 20,
   "notes": "v2: セクション分割による外科的改善方式に移行。1サイクルで1セクションのみを改善する。"
 }
