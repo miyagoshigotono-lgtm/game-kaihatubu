@@ -92,24 +92,49 @@ function addParticle(x, y, color) {
 // ===END:STATE===
 
 // ===SECTION:ECOSYSTEM===
-// 魔物の生成・生態系（移動・捕食・繁殖）と、勇者AI。ゲームの「生きている」部分。
 function createMonster(x, y, type) {
-  // type 0 = 草食(被食者) / type 1 = 肉食(捕食者)
-  return { id: ++monsterId, x: x, y: y, type: type, hp: type === 1 ? 14 : 8, energy: 40, cooldown: Math.random() };
+  return { 
+    id: ++monsterId, 
+    x: x, 
+    y: y, 
+    type: type, 
+    hp: type === 1 ? 14 : 8, 
+    energy: 40, 
+    cooldown: Math.random() 
+  };
 }
-function spawnMonster(x, y) {
+
+function spawnMonster(x, y, chainChance = 0.2) {
   const type = Math.random() < 0.35 ? 1 : 0;
   game.monsters.push(createMonster(x, y, type));
+  
+  // 生態系発生アルゴリズム：土の破片から連鎖的に魔物が発生
+  if (Math.random() < chainChance) {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[ny][nx].wall) {
+        // 確率で壁を侵食して魔物を発生させる（ダンジョンの生命力��出）
+        if (Math.random() < 0.4) {
+          game.map[ny][nx].wall = false;
+          spawnMonster(nx, ny, chainChance * 0.5);
+          break;
+        }
+      }
+    }
+  }
 }
+
 function groundNeighbors(x, y) {
   const out = [];
   const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  for (let i = 0; i < dirs.length; i++) {
-    const nx = x + dirs[i][0], ny = y + dirs[i][1];
-    if (isGround(nx, ny)) out.push([nx, ny]);
+  for (const [dx, dy] of dirs) {
+    const nx = x + dx, ny = y + dy;
+    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && !game.map[ny][nx].wall) out.push([nx, ny]);
   }
   return out;
 }
+
 function nearestHero(x, y) {
   let best = null, bestD = Infinity;
   for (const h of game.heroes) {
@@ -126,30 +151,30 @@ function updateEcosystem(dt) {
     m.cooldown -= dt;
 
     if (m.cooldown <= 0) {
-      // 移動
       const opts = groundNeighbors(m.x, m.y);
-      if (opts.length) { const p = opts[(Math.random() * opts.length) | 0]; m.x = p[0]; m.y = p[1]; }
-      m.cooldown = 0.4 + Math.random() * 0.4;
+      if (opts.length) { 
+        const p = opts[(Math.random() * opts.length) | 0]; 
+        m.x = p[0]; m.y = p[1]; 
+      }
+      m.cooldown = 0.6 + Math.random() * 0.4;
 
-      // 捕食：同じマスの被食者を食べる
       if (m.type === 1) {
         const prey = game.monsters.find(o => o.type === 0 && o.x === m.x && o.y === m.y);
-        if (prey) { prey.hp -= 6; m.energy += 18; addParticle(m.x, m.y, '#ff44ff'); }
+        if (prey) { prey.hp -= 8; m.energy += 20; addParticle(m.x, m.y, '#ff44ff'); }
       }
-      // 攻撃：隣接する勇者をかじる
+      
       const nh = nearestHero(m.x, m.y);
-      if (nh.hero && nh.dist <= 1) { nh.hero.hp -= 4; addParticle(nh.hero.x, nh.hero.y, '#ff6b6b'); }
+      if (nh.hero && nh.dist <= 1) { 
+        nh.hero.hp -= 2; 
+        addParticle(nh.hero.x, nh.hero.y, '#ff6b6b'); 
+      }
 
-      // 繁殖
-      if (m.energy > 70) {
+      if (m.energy > 80) {
         m.energy -= 40;
-        const opts2 = groundNeighbors(m.x, m.y);
-        const p = opts2.length ? opts2[(Math.random() * opts2.length) | 0] : [m.x, m.y];
-        game.monsters.push(createMonster(p[0], p[1], m.type));
+        spawnMonster(m.x, m.y, 0);
         addParticle(m.x, m.y, '#00ff88');
       }
     }
-
     if (m.energy <= 0 || m.hp <= 0) game.monsters.splice(i, 1);
   }
 }
@@ -157,9 +182,8 @@ function updateEcosystem(dt) {
 function spawnHeroes(n) {
   for (let i = 0; i < n; i++) {
     let y = (Math.random() * ROWS) | 0;
-    // 入口（左端）付近の地面を探す。なければ掘ってでも出現させる。
-    if (game.map[0][y].wall) game.map[0][y].wall = false;
-    game.heroes.push({ x: 0, y: y, hp: 24 + game.round * 6, cooldown: Math.random() });
+    if (game.map[y][0].wall) game.map[y][0].wall = false;
+    game.heroes.push({ x: 0, y: y, hp: 30 + game.round * 10, cooldown: 0 });
   }
 }
 
@@ -168,24 +192,21 @@ function updateHeroes(dt) {
     const h = game.heroes[i];
     h.cooldown -= dt;
     if (h.cooldown <= 0) {
-      // 最も近い魔物へ一歩近づく
-      let target = null, bestD = Infinity;
-      for (const m of game.monsters) {
-        const d = Math.abs(m.x - h.x) + Math.abs(m.y - h.y);
-        if (d < bestD) { bestD = d; target = m; }
-      }
+      const target = game.monsters.reduce((prev, curr) => {
+        const d = Math.abs(curr.x - h.x) + Math.abs(curr.y - h.y);
+        return (d < prev.d) ? {m: curr, d: d} : prev;
+      }, {m: null, d: Infinity}).m;
+
       if (target) {
         const dx = Math.sign(target.x - h.x), dy = Math.sign(target.y - h.y);
-        if (dx !== 0 && isGround(h.x + dx, h.y)) h.x += dx;
-        else if (dy !== 0 && isGround(h.x, h.y + dy)) h.y += dy;
-        else { const opts = groundNeighbors(h.x, h.y); if (opts.length) { const p = opts[(Math.random() * opts.length) | 0]; h.x = p[0]; h.y = p[1]; } }
-        // 攻撃：隣接する魔物を斬る
-        if (target && Math.abs(target.x - h.x) + Math.abs(target.y - h.y) <= 1) {
-          target.hp -= 8; addParticle(target.x, target.y, '#ffd23f');
-          if (target.hp <= 0) game.monsters = game.monsters.filter(o => o.id !== target.id);
+        if (Math.abs(target.x - h.x) + Math.abs(target.y - h.y) <= 1) {
+          target.hp -= 10; addParticle(target.x, target.y, '#ffd23f');
+        } else if (Math.random() > 0.3) {
+          if (dx !== 0 && !game.map[h.y][h.x + dx].wall) h.x += dx;
+          else if (dy !== 0 && !game.map[h.y + dy][h.x].wall) h.y += dy;
         }
       }
-      h.cooldown = 0.5;
+      h.cooldown = 0.8;
     }
     if (h.hp <= 0) { addParticle(h.x, h.y, '#ffffff'); game.heroes.splice(i, 1); }
   }

@@ -10,17 +10,18 @@
     "RENDER": "render()。地形・魔物・勇者・魔王・パーティクル・HUDの描画。"
   },
   "recent_sections": [
-    "UPDATE",
     "RENDER",
     "STATE",
-    "INIT_INPUT"
+    "INIT_INPUT",
+    "ECOSYSTEM"
   ],
   "implemented_features": [
     "[INIT_INPUT] window.addEventListener('keydown', (e) => { if (game.phase === 'dig' && game.dig…",
     "[UPDATE] update(dt)関数内に、魔物の生死判定と勇者の侵攻AIを実装する。具体的には、m.hpが0以下になった魔物を配列から削除し、勇者が最も近い地面マスを目指し…",
     "[RENDER] render()関数を拡張し、以下の視覚情報を実装する。1. 採掘可能な壁と通行可能な地面を色分けし、壁にはテクスチャ風のノイズ（矩形分割）を描画する。2. 魔…",
     "[STATE] gameオブジェクト内に、採掘した壁の履歴を管理する二次元配列 `map[COLS][ROWS]` の初期化ロジックを追加し、`game.map[x][y] =…",
-    "[INIT_INPUT] キーボードイベントリスナーを実装し、魔王（player）の座標をWASDキーで移動させ、隣接する壁に対してスペースキーまたはEnterキーで採掘（dig）を実行…"
+    "[INIT_INPUT] キーボードイベントリスナーを実装し、魔王（player）の座標をWASDキーで移動させ、隣接する壁に対してスペースキーまたはEnterキーで採掘（dig）を実行…",
+    "[ECOSYSTEM] 魔物が壁を掘削した際に発生する「土の破片」から魔物を自動生成するロジックを実装する。具体的には、digTile(x, y)関数内で壁が破壊された際、その座標にs…"
   ],
   "failed_approaches": [],
   "current_cycle": 0
