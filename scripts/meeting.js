@@ -1,9 +1,11 @@
 'use strict';
 /*
- * lunch.js — ランチ（コード改善フェーズ）v3 [C案: 対称型]
- *   morning.js と同じ「セクション選定→生成→QA→game.html更新」を独立して実行する。
- *   morning_directive.json への依存を廃止。feature_registry.json で morning.js と連携する。
- *   user_intent.json を読み込み、オーナーの意図をプロンプトに反映する。
+ * meeting.js — 開発会議（1回分）v4
+ *   朝礼/ランチを統合した単一のミーティング。1回の実行で以下を行う：
+ *     セクション選定 → コード生成 → 実行ゲート → QA → game.html更新 → 台本生成。
+ *   夜バッチ(meeting.yml)から複数回・時差で呼ばれる。
+ *   feature_registry.json で履歴を引き継ぎ、user_intent.json で意図を反映する。
+ *   起動時に game.html が壊れていたら game.last-good.html へ自動巻き戻し。
  *   外部npm不使用。Node標準の https と fs のみ。
  */
 const fs = require('fs');
@@ -14,7 +16,7 @@ const LAST_GOOD = 'game.last-good.html';
 const MODEL = 'gemini-3.1-flash-lite';
 const API_KEY = process.env.GEMINI_API_KEY || '';
 const MAX_RETRY = 2;
-const CYCLE_TYPE = 'lunch';
+const CYCLE_TYPE = 'meeting';
 
 const GAME_SOUL = `
 【ゲームタイトル】破壊神のダンジョンメイカー
@@ -209,7 +211,7 @@ function verifyFullHtml(html) {
 function isPass(s) { return String(s == null ? '' : s).trim().toUpperCase() === 'PASS'; }
 
 // ============================================================
-// セクション選定
+// セクション選定（feature_registry と user_intent を考慮）
 // ============================================================
 async function selectSection(gameHtml, registry, userIntent, logs) {
   const recentSections = Array.isArray(registry.recent_sections) ? registry.recent_sections.slice(-3) : [];
