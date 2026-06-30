@@ -333,7 +333,9 @@
       node.querySelector('.bubble-text').textContent = turn.line;
       b.style.display='block';
       b.style.animation='none'; void b.offsetWidth; b.style.animation='pop .35s ease both';
-      await sleep(Math.max(1400, Math.min(4000, turn.line.length*90)));
+      // 会話速度 0.5倍速（表示時間を2倍に）
+      const PLAY_SPEED = 0.5;
+      await sleep(Math.max(1400, Math.min(4000, turn.line.length*90)) / PLAY_SPEED);
     }
   }
 
