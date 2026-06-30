@@ -183,17 +183,22 @@
   // 空のうちは端末内(localStorage)にのみ保存される。
   const GAS_ENDPOINT = '';
 
-  // エージェントの基本設定（実パイプラインの役割に対応）
+  // 登場人物
   const AGENTS = {
-    director:   { name:'司令塔',     color:'#ff8a3d' },
+    bucho:      { name:'部長',       color:'#ff8a3d' },
+    shunin:     { name:'主任',       color:'#9b6bff' },
     programmer: { name:'プログラマー', color:'#3aa0ff' },
-    qa:         { name:'QA',         color:'#54c267' },
-    pr:         { name:'広報',       color:'#9b6bff' }
+    // ↓ オフィスにいるその他の従業員
+    designer:   { name:'デザイナー',  color:'#54c267' },
+    keiri:      { name:'経理',       color:'#e29ac0' },
+    shinjin:    { name:'新人',       color:'#ffcb2b' }
   };
-  // 会議室の着席位置（720x340ステージ内）
-  const MEETING_SEATS = { director:[78,150], programmer:[245,108], qa:[400,108], pr:[565,150] };
-  // オフィスの位置
-  const OFFICE_SEATS  = { director:[96,150], programmer:[250,150], qa:[404,150], pr:[558,150] };
+  // 会議メンバー（3人）と着席位置（720x340ステージ内）
+  const MEETING_ROLES = ['bucho','programmer','shunin'];
+  const MEETING_SEATS = { bucho:[120,150], programmer:[348,104], shunin:[560,150] };
+  // オフィス（会議の3人＋その他従業員）
+  const OFFICE_ROLES  = ['bucho','shunin','programmer','designer','keiri','shinjin'];
+  const OFFICE_SEATS  = { bucho:[64,172], shunin:[250,152], programmer:[432,172], designer:[604,152], keiri:[158,92], shinjin:[470,92] };
   const SECTION_JP = { CONFIG:'設定', STATE:'状態', ECOSYSTEM:'生態系', INIT_INPUT:'操作・初期化', UPDATE:'更新処理', RENDER:'描画' };
 
   // ===== ユーティリティ =====
@@ -219,6 +224,7 @@
     document.querySelectorAll('.room').forEach(s=>s.classList.remove('show'));
     document.getElementById('room-'+name).classList.add('show');
     document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.room===name));
+    if(name==='office') ensureOffice();   // オフィスは常にメンバーがいる
   }
 
   // ===== バックエンド送信（GAS or localStorage） =====
@@ -272,6 +278,27 @@
       setTimeout(()=>{ n.style.transform='translateY(0)'; n.style.opacity='1'; }, i*140);
     });
   }
+  // オフィス用：アニメなしで最初から着席させる
+  function seatInstant(nodes){
+    Object.values(nodes).forEach(n=>{
+      n.style.transition='none';
+      n.style.transform='translateY(0)'; n.style.opacity='1';
+      requestAnimationFrame(()=>{ n.style.transition='transform .8s cubic-bezier(.34,1.3,.5,1),opacity .5s'; });
+    });
+  }
+  // 会議終了：画面外へ歩いて解散
+  async function walkOff(nodes){
+    const arr=Object.values(nodes);
+    arr.forEach(n=>{ const b=n.querySelector('.bubble'); if(b) b.style.display='none'; });
+    await sleep(600);
+    arr.forEach((n,i)=>{
+      const dir = (i%2===0) ? -1 : 1;
+      n.style.transition='transform 1.2s ease-in, opacity 1.2s';
+      n.style.transform=`translateX(${dir*760}px)`;
+      n.style.opacity='0';
+    });
+    await sleep(1300);
+  }
 
   async function playScript(nodes, turns){
     // 全吹き出し非表示
@@ -315,18 +342,17 @@
     const task = (log && log.task) ? String(log.task) : '';
     const taskShort = task ? task.slice(0,40) : 'いろいろ';
     return [
-      { role:'director',   line:`さあ、今日の開発会議を始めよう。テーマは「${sec}」だ。` },
-      { role:'qa',         line: ok ? '前回の動作チェック、問題なしでした！' : '前回はここがうまく動かなくて…要注意です。' },
-      { role:'programmer', line:`${taskShort}…を実装してみたよ。` },
-      { role:'qa',         line: ok ? 'うん、ちゃんと動いてる。合格！' : 'もう一息！ここを直そう。' },
-      { role:'director',   line: ok ? 'いいぞ。今日も一歩前進だ。' : '次こそ仕上げよう。みんな頼んだ。' }
+      { role:'bucho',      line:`では、今日の開発会議を始める。テーマは「${sec}」だ。` },
+      { role:'shunin',     line: ok ? '前回の動作確認、問題ありませんでした。' : '前回はここが動かず…今日は要注意です。' },
+      { role:'programmer', line:`${taskShort}…を実装してみました。` },
+      { role:'shunin',     line: ok ? '確認しました。バッチリ動いてます、合格です！' : 'もう一息ですね。ここを直しましょう。' },
+      { role:'bucho',      line: ok ? 'よし、今日も一歩前進だ。みんなご苦労。' : '次こそ仕上げよう。頼んだぞ。' }
     ];
   }
   async function playMeeting(){
     const btn=document.getElementById('btnMeeting'); btn.disabled=true;
     document.getElementById('meetingEmpty').style.display='none';
-    const roles=['director','programmer','qa','pr'];
-    const nodes=renderAgents('meetingAgents', MEETING_SEATS, roles);
+    const nodes=renderAgents('meetingAgents', MEETING_SEATS, MEETING_ROLES);
     seatIn(nodes);
     await sleep(900);
     const turns = (TRANSCRIPT && Array.isArray(TRANSCRIPT.turns) && TRANSCRIPT.turns.length)
@@ -335,6 +361,10 @@
     await playScript(nodes, turns);
     const ok = TRANSCRIPT ? TRANSCRIPT.success : (LATEST && LATEST.result==='success');
     if(ok) burstConfetti();
+    await sleep(ok ? 1200 : 400);
+    await walkOff(nodes);                       // 画面外へ歩いて解散
+    document.getElementById('meetingAgents').innerHTML='';
+    document.getElementById('meetingEmpty').style.display='block';
     btn.disabled=false;
   }
 
@@ -345,20 +375,29 @@
     const treats = lsGet('treatsGiven', []);
     const streak = lsGet('streakCount', 1);
     const t = [];
-    t.push({ role:'programmer', line:'あ、社長だ。今日も来てくれたんだね。' });
-    if(treats.length) t.push({ role:'pr', line:`この前の差し入れ、おいしかった〜！ありがとう。` });
-    else t.push({ role:'pr', line:'差し入れ…ちょっと待ってたり、して。なんてね。' });
-    if(lowSat) t.push({ role:'qa', line:'昨日の評価、きびしかったね…！でも逆に燃えるよ。' });
-    else t.push({ role:'qa', line:'最近うまくいってる気がするんだ、ね。' });
-    t.push({ role:'director', line:`${streak}日も通ってくれて、チーム一同 感謝してるよ。` });
+    t.push({ role:'shinjin', line:'あっ、社長だ！おつかれさまです！' });
+    t.push({ role:'keiri',   line:'今月もよく開発が進んでますねぇ。' });
+    if(treats.length) t.push({ role:'designer', line:'この前の差し入れ、おいしかった〜！ありがとうございます。' });
+    else t.push({ role:'designer', line:'差し入れ…ちょっと待ってたり、して。なんてね。' });
+    if(lowSat) t.push({ role:'shunin', line:'昨日の評価、きびしかったなぁ…！でも逆に燃えるよ。' });
+    else t.push({ role:'programmer', line:'最近うまくいってる気がするんだよね。' });
+    t.push({ role:'shinjin', line:`部長、社長って${streak}日も連続で来てるんですね…！` });
+    t.push({ role:'bucho',   line:'ああ。ありがたい話だ。我々も応えねばな。' });
     return t;
+  }
+  let officeReady = false;
+  function ensureOffice(){
+    const c=document.getElementById('officeAgents');
+    if(officeReady && c.children.length) return window._officeNodes;
+    const nodes=renderAgents('officeAgents', OFFICE_SEATS, OFFICE_ROLES);
+    seatInstant(nodes);
+    window._officeNodes = nodes; officeReady = true;
+    return nodes;
   }
   async function peekOffice(){
     const btn=document.getElementById('btnPeek'); btn.disabled=true;
-    const roles=['director','programmer','qa','pr'];
-    const nodes=renderAgents('officeAgents', OFFICE_SEATS, roles);
-    seatIn(nodes);
-    await sleep(700);
+    const nodes=ensureOffice();
+    await sleep(200);
     const turns = (GOSSIP && Array.isArray(GOSSIP.turns) && GOSSIP.turns.length) ? GOSSIP.turns : gossipTurns();
     await playScript(nodes, turns);
     btn.disabled=false;
@@ -383,12 +422,11 @@
     await sendToBackend('treat', { emoji: inv[key].emoji, name: inv[key].name, date: todayStr() });
     showToast(`${inv[key].emoji} 差し入れしました！みんな喜んでいます`, '🍡');
     // ごきげんな一言
-    const roles=['director','programmer','qa','pr'];
-    const nodes=renderAgents('officeAgents', OFFICE_SEATS, roles);
-    seatIn(nodes); await sleep(700);
+    const nodes=ensureOffice(); await sleep(200);
     await playScript(nodes, [
-      { role:'programmer', line:`わ、${inv[key].name}だ！いただきます！` },
-      { role:'qa', line:'やる気でてきた〜！' }
+      { role:'shinjin', line:`わ、${inv[key].name}だ！いただきます！` },
+      { role:'designer', line:'やる気でてきた〜！' },
+      { role:'bucho', line:'社長、いつもすまんな。' }
     ]);
   }
 
