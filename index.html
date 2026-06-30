@@ -3,518 +3,541 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>破壊神のダンジョンメイカー — 開発室</title>
+  <title>ダンジョン開発スタジオ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --ink: #2b2b3a;
-      --accent: #ff8a3d;
-      --accent-soft: rgba(255,138,61,.35);
-      --green: #54c267;
-      --muted: #9a8f7e;
-      --panel: #fffdf8;
-    }
-    body {
-      background: radial-gradient(circle at 50% -10%, #fff7ea 0%, #fdf3e3 45%, #f7e7cf 100%);
-      background-attachment: fixed;
-      min-height: 100vh;
-      color: var(--ink);
-      font-family: 'M PLUS Rounded 1c', -apple-system, BlinkMacSystemFont, sans-serif;
-      line-height: 1.65;
-      padding-bottom: 64px;
-    }
-    details summary::-webkit-details-marker { display: none; }
+    *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --ink:#2b2b3a; --accent:#ff8a3d; --accent-soft:rgba(255,138,61,.35); --green:#54c267; --muted:#9a8f7e; --panel:#fffdf8; }
+    body { background: radial-gradient(circle at 50% -10%, #fff7ea 0%, #fdf3e3 45%, #f7e7cf 100%); background-attachment: fixed; min-height:100vh; color:var(--ink); font-family:'M PLUS Rounded 1c',-apple-system,BlinkMacSystemFont,sans-serif; line-height:1.6; padding-bottom:70px; }
+    details summary::-webkit-details-marker { display:none; }
 
-    @keyframes bobMove { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
-    @keyframes blink { 0%,92%,100%{transform:scaleY(1)} 96%{transform:scaleY(.15)} }
-    @keyframes fall { 0%{transform:translateY(-30px) rotate(0);opacity:1} 100%{transform:translateY(360px) rotate(540deg);opacity:0} }
-    @keyframes pop { 0%{transform:scale(.6);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
-    @keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-    @keyframes toastIn { 0%{transform:translateY(20px) scale(.9);opacity:0} 100%{transform:translateY(0) scale(1);opacity:1} }
-    @keyframes torch { 0%,100%{opacity:.55} 50%{opacity:.9} }
+    @keyframes bobMove{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+    @keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.15)}}
+    @keyframes fall{0%{transform:translateY(-30px) rotate(0);opacity:1}100%{transform:translateY(320px) rotate(540deg);opacity:0}}
+    @keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+    @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes toastIn{0%{transform:translateY(20px) scale(.9);opacity:0}100%{transform:translateY(0) scale(1);opacity:1}}
+    @keyframes torch{0%,100%{opacity:.55}50%{opacity:.9}}
+    @keyframes roomIn{0%{transform:translateY(10px);opacity:.4}100%{transform:translateY(0);opacity:1}}
+    @keyframes noteDrop{0%{opacity:0;transform:translateY(-26px) rotate(-8deg) scale(.8)}70%{transform:translateY(4px) rotate(3deg) scale(1.04)}100%{opacity:1;transform:translateY(0) rotate(-3deg) scale(1)}}
+    @keyframes treatPop{0%{opacity:0;transform:translateY(-18px) scale(.4)}60%{transform:translateY(3px) scale(1.15)}100%{opacity:1;transform:translateY(0) scale(1)}}
 
-    /* チャンキーなボタン共通 */
-    .btn-pop {
-      font-family: inherit; cursor: pointer; border: 3px solid var(--ink);
-      border-radius: 14px; font-weight: 800; font-size: .95rem; padding: 11px 22px;
-      box-shadow: 0 5px 0 rgba(43,43,58,.25); color: var(--ink);
-      display: inline-flex; align-items: center; gap: 8px;
-      transition: transform .06s, box-shadow .06s;
-    }
-    .btn-pop:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(43,43,58,.25); }
-    .btn-pop:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-orange { background: var(--accent); }
-    .btn-green  { background: var(--green); }
-    .btn-white  { background: #fff; }
-
-    .chip {
-      font-family: inherit; cursor: pointer; background: #fff; border: 2.5px solid var(--ink);
-      border-radius: 999px; padding: 6px 14px; font-size: .82rem; font-weight: 700;
-      box-shadow: 0 3px 0 rgba(43,43,58,.12); transition: transform .06s, box-shadow .06s;
-    }
-    .chip:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(43,43,58,.12); }
-
-    .pill {
-      background: #fff; border: 2.5px solid var(--ink); border-radius: 999px;
-      padding: 4px 12px; font-size: .78rem; font-weight: 700;
-      box-shadow: 0 3px 0 rgba(43,43,58,.12); white-space: nowrap;
-    }
-
-    textarea.intent-area {
-      width: 100%; min-height: 96px; resize: vertical; font-family: inherit;
-      font-size: .95rem; font-weight: 500; line-height: 1.6; border: 3px solid var(--ink);
-      border-radius: 14px; padding: 12px 14px; background: #fff; color: var(--ink); outline: none;
-    }
-    textarea.intent-area:focus { box-shadow: 0 0 0 4px var(--accent-soft); }
-
-    .sec-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-    .sec-title b { font-size: 1.05rem; font-weight: 800; }
-    .sec-title span { font-size: .76rem; font-weight: 500; color: var(--muted); }
-
-    .link-quiet { color: var(--muted); font-weight: 700; font-size: .78rem; text-decoration: none; border-bottom: 2px solid var(--accent-soft); }
-    .link-quiet:hover { color: var(--accent); }
-
-    .status-line { text-align: center; font-size: .82rem; font-weight: 700; min-height: 1.3em; margin-top: 10px; }
-    .status-line.ok { color: var(--green); }
-    .status-line.ng { color: #d24b4b; }
+    .btn-pop { font-family:inherit; cursor:pointer; border:3px solid var(--ink); border-radius:14px; font-weight:800; font-size:.96rem; padding:11px 26px; box-shadow:0 5px 0 rgba(43,43,58,.25); color:var(--ink); display:inline-flex; align-items:center; gap:8px; transition:transform .08s,box-shadow .08s; }
+    .btn-pop:active{ transform:translateY(3px); box-shadow:0 2px 0 rgba(43,43,58,.25); }
+    .btn-pop:disabled{ opacity:.55; cursor:default; }
+    .nav-btn { font-family:inherit; cursor:pointer; border:3px solid var(--ink); border-radius:14px; padding:8px 6px; background:#fff; color:var(--ink); box-shadow:0 4px 0 rgba(43,43,58,.18); display:flex; flex-direction:column; align-items:center; gap:1px; transition:transform .12s,box-shadow .12s; }
+    .nav-btn.active { background:var(--accent); color:#fff; transform:translateY(2px); box-shadow:0 2px 0 rgba(43,43,58,.18); }
+    .pill { background:#fff; border:2.5px solid var(--ink); border-radius:999px; padding:4px 12px; box-shadow:0 3px 0 rgba(43,43,58,.12); display:flex; align-items:center; gap:5px; white-space:nowrap; }
+    textarea.draft { width:100%; min-height:84px; resize:vertical; font-family:inherit; font-size:.95rem; font-weight:500; line-height:1.6; border:3px solid var(--ink); border-radius:14px; padding:12px 14px; background:#fff; color:var(--ink); outline:none; }
+    textarea.draft:focus{ box-shadow:0 0 0 4px var(--accent-soft); }
+    .room { display:none; animation:roomIn .35s ease both; }
+    .room.show { display:block; }
+    .sec-head { display:flex; align-items:center; gap:9px; margin-bottom:12px; }
+    .sec-head b { font-size:1.05rem; font-weight:800; }
+    .sec-head span { font-size:.75rem; font-weight:500; color:var(--muted); }
+    .status-line { text-align:center; font-size:.8rem; font-weight:700; min-height:1.2em; margin-top:8px; }
+    .status-line.ng { color:#d24b4b; }
   </style>
 </head>
 <body>
+<div id="studio" style="min-height:100vh;">
 
   <!-- ===== HEADER ===== -->
   <header style="position:sticky;top:0;z-index:40;background:#fffdf8;border-bottom:3px solid #2b2b3a;box-shadow:0 4px 0 rgba(43,43,58,.08);">
-    <div style="max-width:980px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-      <div style="width:46px;height:46px;border-radius:14px;border:3px solid #2b2b3a;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 rgba(43,43,58,.2);font-size:24px;flex-shrink:0;">🏰</div>
-      <div style="flex:1;min-width:160px;">
-        <div style="font-size:1.18rem;font-weight:800;letter-spacing:.01em;line-height:1.2;">破壊神のダンジョンメイカー</div>
-        <div style="font-size:.74rem;font-weight:500;color:#9a8f7e;">まいにち自動で育つ ゲーム開発室</div>
+    <div style="max-width:900px;margin:0 auto;padding:11px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="width:44px;height:44px;border-radius:13px;border:3px solid #2b2b3a;background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 rgba(43,43,58,.2);font-size:23px;flex-shrink:0;">🏰</div>
+      <div style="flex:1;min-width:150px;">
+        <div style="font-size:1.12rem;font-weight:800;line-height:1.2;">ダンジョン開発スタジオ</div>
+        <div style="font-size:.72rem;font-weight:500;color:#9a8f7e;">社長：あなた ／ AI開発チームを率いてゲームを育てよう</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="headerPills">
-        <div class="pill">サイクル <b style="color:var(--accent)" id="pillCycle">–</b></div>
-        <div class="pill">成功 <b style="color:#54c267" id="pillSuccess">–</b></div>
-        <div class="pill" id="pillUpdated">読み込み中…</div>
+      <div class="pill"><span style="font-size:.95rem;">🔥</span><span id="streakText" style="font-size:.8rem;font-weight:800;">1日 連続</span></div>
+      <div class="pill" id="headerItems" style="gap:6px;"></div>
+    </div>
+
+    <!-- ROOM NAV -->
+    <div style="max-width:900px;margin:0 auto;padding:0 18px 12px;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <button class="nav-btn" data-room="game"    onclick="showRoom('game')"><span style="font-size:1.35rem;line-height:1;">🎮</span><span style="font-size:.74rem;font-weight:800;">ゲーム</span></button>
+        <button class="nav-btn" data-room="meeting" onclick="showRoom('meeting')"><span style="font-size:1.35rem;line-height:1;">🗣</span><span style="font-size:.74rem;font-weight:800;">会議室</span></button>
+        <button class="nav-btn" data-room="office"  onclick="showRoom('office')"><span style="font-size:1.35rem;line-height:1;">☕</span><span style="font-size:.74rem;font-weight:800;">オフィス</span></button>
+        <button class="nav-btn" data-room="desk"    onclick="showRoom('desk')"><span style="font-size:1.35rem;line-height:1;">📝</span><span style="font-size:.74rem;font-weight:800;">社長デスク</span></button>
       </div>
     </div>
   </header>
 
-  <div style="max-width:980px;margin:0 auto;padding:26px 20px 0;display:flex;flex-direction:column;gap:30px;">
+  <div style="max-width:900px;margin:0 auto;padding:22px 18px 0;">
 
-    <!-- ===== GAME PREVIEW ===== -->
-    <section>
-      <div class="sec-title"><b>🎮 いまのゲーム</b><span>枠いっぱいにフィットするよ</span></div>
+    <!-- ===== GAME ===== -->
+    <section id="room-game" class="room">
+      <div class="sec-head"><b>🎮 ゲーム画面</b><span>いまの製品をテストプレイ</span></div>
       <div style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:22px;padding:14px;box-shadow:0 6px 0 rgba(43,43,58,.15);">
         <div style="position:relative;width:100%;aspect-ratio:16/10;border-radius:14px;overflow:hidden;border:3px solid #2b2b3a;background:#0d0b16;">
-          <iframe id="gameFrame" src="game.html" title="破壊神のダンジョンメイカー"
-                  style="position:absolute;inset:0;width:100%;height:100%;border:0;display:block;"></iframe>
+          <iframe id="gameFrame" src="game.html" title="ゲーム" style="position:absolute;inset:0;width:100%;height:100%;border:0;display:block;"></iframe>
         </div>
       </div>
-      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
-        <button class="btn-pop btn-orange" id="btnMorning" onclick="dispatchWorkflow('morning.yml')">☀️ 朝礼を見る</button>
-        <button class="btn-pop btn-green" id="btnLunch" onclick="dispatchWorkflow('lunch.yml')">🍱 ランチを見る</button>
-        <button class="btn-pop btn-white" onclick="reloadGame()">🔄 リロード</button>
-      </div>
-      <div class="status-line" id="statusMsg"></div>
-      <div style="text-align:center;font-size:.72rem;color:#b3a890;font-weight:500;margin-top:4px;">
-        手動実行にはGitHubトークン（classic PATの <b>repo</b> スコープ推奨）が必要です。
-        <a href="#" class="link-quiet" onclick="resetToken();return false;">トークンをリセット</a>
-        <span id="tokenState"></span>
+      <div style="display:flex;justify-content:center;margin-top:16px;">
+        <button class="btn-pop" style="background:#fff;" onclick="reloadGame()">🔄 ゲームをリロード</button>
       </div>
     </section>
 
-    <!-- ===== 会議室ステージ ===== -->
-    <section>
-      <div class="sec-title"><b>👀 開発のようす</b><span id="stageHint">最新サイクルのもよう</span></div>
-      <div style="position:relative;background:linear-gradient(180deg,#cfe8ff 0%,#e7f4ff 55%,#d8c4a0 55%, #c9b08a 100%);border:3px solid #2b2b3a;border-radius:22px;box-shadow:0 6px 0 rgba(43,43,58,.15);overflow:hidden;">
-        <div style="position:relative;width:100%;height:0;padding-bottom:46%;min-height:300px;">
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:760px;height:340px;">
-
-            <!-- 窓 -->
-            <div style="position:absolute;left:36px;top:30px;width:90px;height:70px;border:3px solid #2b2b3a;border-radius:8px;background:linear-gradient(180deg,#bfe3ff,#8fc9ff);box-shadow:inset 0 0 0 6px #fffdf8;"></div>
-            <div style="position:absolute;right:36px;top:30px;width:90px;height:70px;border:3px solid #2b2b3a;border-radius:8px;background:linear-gradient(180deg,#bfe3ff,#8fc9ff);box-shadow:inset 0 0 0 6px #fffdf8;"></div>
-
-            <!-- ホワイトボード -->
-            <div style="position:absolute;left:50%;top:14px;transform:translateX(-50%);width:300px;background:#fffdf8;border:3px solid #2b2b3a;border-radius:14px;padding:10px 14px;box-shadow:0 5px 0 rgba(43,43,58,.18);text-align:center;z-index:5;">
-              <div id="boardKicker" style="font-size:.66rem;font-weight:800;letter-spacing:.12em;color:#c79a4e;">本日の議題</div>
-              <div id="boardTitle" style="font-size:.92rem;font-weight:800;line-height:1.35;margin-top:2px;">読み込み中…</div>
+    <!-- ===== MEETING ===== -->
+    <section id="room-meeting" class="room">
+      <div class="sec-head"><b>🗣 会議室</b><span id="meetingHint">きょうの開発会議</span></div>
+      <div style="display:flex;align-items:center;gap:10px;background:#fffdf8;border:3px solid #2b2b3a;border-radius:16px;padding:11px 16px;box-shadow:0 4px 0 rgba(43,43,58,.12);margin-bottom:14px;">
+        <span style="font-size:1.4rem;">📋</span>
+        <div>
+          <div style="font-size:.66rem;font-weight:800;letter-spacing:.1em;color:#c79a4e;">きょうの議題</div>
+          <div id="agendaText" style="font-size:.95rem;font-weight:800;">読み込み中…</div>
+        </div>
+      </div>
+      <div style="position:relative;background:linear-gradient(180deg,#cfe8ff 0%,#e7f4ff 52%,#d8c4a0 52%,#c9b08a 100%);border:3px solid #2b2b3a;border-radius:22px;box-shadow:0 6px 0 rgba(43,43,58,.15);overflow:hidden;">
+        <div style="position:relative;width:100%;height:0;padding-bottom:52%;min-height:300px;">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:720px;height:340px;">
+            <div style="position:absolute;left:30px;top:26px;width:84px;height:64px;border:3px solid #2b2b3a;border-radius:8px;background:linear-gradient(180deg,#bfe3ff,#8fc9ff);box-shadow:inset 0 0 0 6px #fffdf8;"></div>
+            <div style="position:absolute;right:30px;top:26px;width:84px;height:64px;border:3px solid #2b2b3a;border-radius:8px;background:linear-gradient(180deg,#bfe3ff,#8fc9ff);box-shadow:inset 0 0 0 6px #fffdf8;"></div>
+            <div style="position:absolute;left:50%;bottom:42px;transform:translateX(-50%);width:400px;height:100px;border-radius:50%;background:#a9743f;border:3px solid #2b2b3a;box-shadow:0 10px 0 #7c531f,0 12px 0 rgba(43,43,58,.2);z-index:2;"></div>
+            <div style="position:absolute;left:50%;bottom:62px;transform:translateX(-50%);width:320px;height:58px;border-radius:50%;background:#c08a4e;border:2px solid #2b2b3a;z-index:2;"></div>
+            <div id="meetingEmpty" style="position:absolute;left:50%;top:120px;transform:translateX(-50%);text-align:center;z-index:6;animation:floatY 3s ease-in-out infinite;">
+              <div style="font-size:44px;">🪑💤</div>
+              <div style="background:#fffdf8;border:2.5px solid #2b2b3a;border-radius:999px;padding:5px 16px;font-size:.8rem;font-weight:700;box-shadow:0 4px 0 rgba(43,43,58,.15);margin-top:6px;">「会議を再生」でチームが集まります</div>
             </div>
-
-            <!-- テーブル -->
-            <div style="position:absolute;left:50%;bottom:46px;transform:translateX(-50%);width:380px;height:96px;border-radius:50%;background:#a9743f;border:3px solid #2b2b3a;box-shadow:0 10px 0 #7c531f, 0 12px 0 rgba(43,43,58,.2);z-index:2;"></div>
-            <div style="position:absolute;left:50%;bottom:64px;transform:translateX(-50%);width:300px;height:54px;border-radius:50%;background:#c08a4e;border:2px solid #2b2b3a;z-index:2;"></div>
-
-            <!-- 空室プロンプト -->
-            <div id="roomEmpty" style="position:absolute;left:50%;top:150px;transform:translateX(-50%);text-align:center;z-index:6;animation:floatY 3s ease-in-out infinite;display:none;">
-              <div style="font-size:46px;">🪑💤</div>
-              <div style="background:#fffdf8;border:2.5px solid #2b2b3a;border-radius:999px;padding:5px 16px;font-size:.82rem;font-weight:700;box-shadow:0 4px 0 rgba(43,43,58,.15);margin-top:6px;">上のボタンを押すと みんな集まってくるよ！</div>
-            </div>
-
-            <!-- エージェント（司令塔・プログラマー・QA） -->
-            <div id="agents"></div>
-
+            <div id="meetingAgents"></div>
+            <div id="confetti" style="position:absolute;inset:0;pointer-events:none;z-index:30;display:none;"></div>
           </div>
         </div>
       </div>
+      <div style="display:flex;justify-content:center;margin-top:16px;">
+        <button class="btn-pop" id="btnMeeting" style="background:#ff8a3d;" onclick="playMeeting()">▶️ 会議を再生</button>
+      </div>
     </section>
 
-    <!-- ===== 意図フォーム ===== -->
-    <section>
-      <div class="sec-title"><b>✏️ AIにおねがいする</b><span>書いて送るだけ。次の朝礼でAIが反映するよ</span></div>
+    <!-- ===== OFFICE ===== -->
+    <section id="room-office" class="room">
+      <div class="sec-head"><b>☕ オフィス</b><span id="officeHint">休憩中のチームの様子</span></div>
+      <div style="position:relative;background:linear-gradient(180deg,#ffe9d4 0%,#fff1e2 52%,#e8d3b3 52%,#dcc296 100%);border:3px solid #2b2b3a;border-radius:22px;box-shadow:0 6px 0 rgba(43,43,58,.15);overflow:hidden;">
+        <div style="position:relative;width:100%;height:0;padding-bottom:52%;min-height:300px;">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:720px;height:340px;">
+            <div style="position:absolute;left:24px;bottom:40px;font-size:42px;z-index:1;">🪴</div>
+            <div style="position:absolute;right:26px;top:26px;font-size:30px;z-index:1;animation:floatY 4s ease-in-out infinite;">🕒</div>
+            <div style="position:absolute;left:30px;bottom:34px;width:26px;height:54px;border-radius:7px;background:#bfe3ff;border:2.5px solid #2b2b3a;z-index:1;box-shadow:0 5px 0 rgba(43,43,58,.18);"></div>
+            <div style="position:absolute;right:34px;bottom:30px;width:96px;height:34px;border-radius:50%;background:#a9743f;border:2.5px solid #2b2b3a;box-shadow:0 7px 0 rgba(43,43,58,.18);z-index:4;display:flex;align-items:center;justify-content:center;">
+              <div id="treatTable" style="display:flex;gap:3px;font-size:1.05rem;"></div>
+            </div>
+            <div style="position:absolute;right:60px;bottom:66px;font-size:.6rem;font-weight:800;color:#8a6f4a;z-index:4;white-space:nowrap;">🍱 差し入れ台</div>
+            <div id="officeAgents"></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:12px;margin-top:16px;flex-wrap:wrap;">
+        <button class="btn-pop" id="btnPeek" style="background:#54c267;" onclick="peekOffice()">👀 のぞく</button>
+        <button class="btn-pop" style="background:#ffcb2b;" onclick="openTreatPicker()">🍡 差し入れする</button>
+      </div>
+      <div class="status-line" id="officeStatus"></div>
+    </section>
+
+    <!-- ===== DESK ===== -->
+    <section id="room-desk" class="room">
+      <div class="sec-head"><b>📝 社長デスク</b><span>明日への指示と、今日の評価</span></div>
+
+      <div style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:22px;padding:18px;box-shadow:0 6px 0 rgba(43,43,58,.15);margin-bottom:18px;">
+        <div style="font-size:.92rem;font-weight:800;margin-bottom:4px;">✏️ 明日の指示を付箋に書く</div>
+        <div style="font-size:.74rem;font-weight:500;color:#9a8f7e;margin-bottom:12px;">むずかしい言葉はいりません。やってほしいことをそのまま書いてね。</div>
+        <div id="noteBoard" style="position:relative;min-height:96px;background:#f3e7d0;border:2px dashed #d8b97f;border-radius:14px;padding:14px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;"></div>
+        <textarea id="draft" class="draft" placeholder="例）魔物をもっと可愛くしてほしい。ボス戦を派手にしてほしい。"></textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+          <button class="btn-pop" id="btnPlaceNote" style="background:var(--accent);color:#fff;" onclick="placeNote()">📌 机に置く</button>
+        </div>
+        <div class="status-line" id="noteStatus"></div>
+      </div>
+
+      <div style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:22px;padding:18px;box-shadow:0 6px 0 rgba(43,43,58,.15);margin-bottom:18px;">
+        <div style="font-size:.92rem;font-weight:800;margin-bottom:6px;">⭐ 今日の開発を評価する</div>
+        <div style="font-size:.72rem;font-weight:500;color:#9a8f7e;margin-bottom:10px;">評価はチームの明日のやる気と、オフィスの雑談に反映されます。</div>
+        <div id="ratingRows"></div>
+        <div class="status-line" id="ratingStatus"></div>
+      </div>
+
       <div style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:22px;padding:18px;box-shadow:0 6px 0 rgba(43,43,58,.15);">
-        <div style="background:#fff6e9;border:2px dashed #e0b878;border-radius:14px;padding:12px 14px;margin-bottom:16px;">
-          <div style="font-size:.68rem;font-weight:800;letter-spacing:.1em;color:#c79a4e;margin-bottom:4px;">いまのおねがい</div>
-          <div id="intentCurrent" style="font-size:.92rem;font-weight:500;line-height:1.6;">読み込み中…</div>
-        </div>
-
-        <div id="chipRow" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
-
-        <textarea id="intentDraft" class="intent-area" placeholder="例）魔物をもっと可愛くしてほしい。ボス戦を派手にしてほしい。"></textarea>
-
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap;">
-          <span style="font-size:.74rem;font-weight:500;color:#9a8f7e;">
-            むずかしい言葉はいりません。やってほしいことを そのまま書いてね。
-            <a href="https://github.com/miyagoshigotono-lgtm/game-kaihatubu/edit/main/user_intent.json" target="_blank" rel="noopener" class="link-quiet">GitHubで直接編集</a>
-          </span>
-          <button class="btn-pop" id="btnSend" style="background:var(--accent);color:#fff;font-size:1rem;padding:11px 28px;" onclick="sendIntent()">📨 エージェントに送る</button>
-        </div>
-        <div class="status-line" id="intentStatus"></div>
+        <div style="font-size:.92rem;font-weight:800;margin-bottom:3px;">🎁 もちもの（ログインで配給）</div>
+        <div style="font-size:.74rem;font-weight:500;color:#9a8f7e;margin-bottom:12px;">オフィスで差し入れすると、チームの雑談がごきげんになります。</div>
+        <div id="inventoryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;"></div>
       </div>
     </section>
 
-    <!-- ===== 開発ログ ===== -->
-    <section>
-      <div class="sec-title"><b>📜 これまでの開発ログ</b><span id="logCount"></span></div>
-      <div style="display:flex;flex-direction:column;gap:10px;" id="logList">
-        <div style="text-align:center;color:#b3a890;font-weight:500;padding:20px;">読み込み中…</div>
+  </div>
+
+  <div id="toast" style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:90;display:none;">
+    <div style="background:#2b2b3a;color:#fffdf8;border-radius:16px;padding:13px 22px;font-weight:800;font-size:.93rem;box-shadow:0 8px 24px rgba(43,43,58,.4);animation:toastIn .4s ease both;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:1.25rem;" id="toastIcon">📨</span><span id="toastMsg"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== 設定 =====
+  const REPO_OWNER = 'miyagoshigotono-lgtm';
+  const REPO_NAME  = 'game-kaihatubu';
+  // GASのWebアプリURL。設定すると付箋・評価・差し入れがサーバーに保存される。
+  // 空のうちは端末内(localStorage)にのみ保存される。
+  const GAS_ENDPOINT = '';
+
+  // エージェントの基本設定（実パイプラインの役割に対応）
+  const AGENTS = {
+    director:   { name:'司令塔',     color:'#ff8a3d' },
+    programmer: { name:'プログラマー', color:'#3aa0ff' },
+    qa:         { name:'QA',         color:'#54c267' },
+    pr:         { name:'広報',       color:'#9b6bff' }
+  };
+  // 会議室の着席位置（720x340ステージ内）
+  const MEETING_SEATS = { director:[78,150], programmer:[245,108], qa:[400,108], pr:[565,150] };
+  // オフィスの位置
+  const OFFICE_SEATS  = { director:[96,150], programmer:[250,150], qa:[404,150], pr:[558,150] };
+  const SECTION_JP = { CONFIG:'設定', STATE:'状態', ECOSYSTEM:'生態系', INIT_INPUT:'操作・初期化', UPDATE:'更新処理', RENDER:'描画' };
+
+  // ===== ユーティリティ =====
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function todayStr(){ const d=new Date(Date.now()+9*36e5); const p=n=>String(n).padStart(2,'0'); return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`; }
+  function fmtTime(ts){ const m=String(ts||'').match(/^\d{4}-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/); return m?`${m[1]}/${m[2]} ${m[3]}:${m[4]}`:String(ts||''); }
+  async function fetchJson(path){ const r=await fetch(path+'?t='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error(path+' '+r.status); return r.json(); }
+  function lsGet(k,fb){ try{ const v=localStorage.getItem(k); return v==null?fb:JSON.parse(v); }catch(e){ return fb; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+  const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+  // ===== トースト =====
+  let toastTimer=null;
+  function showToast(msg, icon){
+    document.getElementById('toastMsg').textContent = msg;
+    document.getElementById('toastIcon').textContent = icon||'📨';
+    const t=document.getElementById('toast'); t.style.display='block';
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ t.style.display='none'; },3200);
+  }
+
+  // ===== 部屋の切り替え =====
+  function showRoom(name){
+    document.querySelectorAll('.room').forEach(s=>s.classList.remove('show'));
+    document.getElementById('room-'+name).classList.add('show');
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.room===name));
+  }
+
+  // ===== バックエンド送信（GAS or localStorage） =====
+  async function sendToBackend(type, payload){
+    if(!GAS_ENDPOINT){ return { ok:true, local:true }; }
+    try{
+      const r=await fetch(GAS_ENDPOINT,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({type,payload}) });
+      return { ok:r.ok };
+    }catch(e){ return { ok:false, error:e.message }; }
+  }
+
+  // ===== キャラDOM生成 =====
+  function buildAgent(roleKey, seat){
+    const a = AGENTS[roleKey];
+    const wrap = document.createElement('div');
+    wrap.style.cssText = `position:absolute;left:${seat[0]}px;top:${seat[1]}px;width:92px;z-index:5;transition:transform .8s cubic-bezier(.34,1.3,.5,1),opacity .5s;`;
+    wrap.style.transform = 'translateY(300px)';
+    wrap.style.opacity = '0';
+    wrap.innerHTML = `
+      <div class="bubble" style="position:absolute;left:50%;bottom:100px;transform:translateX(-50%);width:190px;background:#fffdf8;border:3px solid #2b2b3a;border-radius:14px;padding:8px 12px;font-size:.78rem;font-weight:700;line-height:1.4;box-shadow:0 5px 0 rgba(43,43,58,.18);text-align:center;z-index:20;display:none;">
+        <span class="bubble-text"></span>
+        <div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:11px solid #2b2b3a;"></div>
       </div>
-    </section>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;animation:bobMove 1.7s ease-in-out infinite;">
+        <div style="position:relative;width:60px;height:58px;background:${a.color};border:3px solid #2b2b3a;border-radius:20px;box-shadow:0 5px 0 rgba(43,43,58,.18);">
+          <div style="position:absolute;left:50%;top:-9px;transform:translateX(-50%);width:28px;height:13px;background:${a.color};border:3px solid #2b2b3a;border-bottom:none;border-radius:14px 14px 0 0;"></div>
+          <div style="position:absolute;left:10px;top:19px;width:14px;height:14px;background:#fffdf8;border:2px solid #2b2b3a;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:blink 4s infinite;"><div style="width:5px;height:5px;background:#2b2b3a;border-radius:50%;"></div></div>
+          <div style="position:absolute;right:10px;top:19px;width:14px;height:14px;background:#fffdf8;border:2px solid #2b2b3a;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:blink 4s infinite;"><div style="width:5px;height:5px;background:#2b2b3a;border-radius:50%;"></div></div>
+          <div style="position:absolute;left:50%;top:38px;transform:translateX(-50%);width:14px;height:7px;border:2px solid #2b2b3a;border-top:none;border-radius:0 0 10px 10px;"></div>
+        </div>
+        <div style="background:#fffdf8;border:2px solid #2b2b3a;border-radius:999px;padding:1px 9px;font-size:.68rem;font-weight:800;box-shadow:0 3px 0 rgba(43,43,58,.14);white-space:nowrap;">${esc(a.name)}</div>
+      </div>`;
+    return wrap;
+  }
 
-    <div style="text-align:center;font-size:.74rem;color:#b3a890;font-weight:500;padding-top:6px;">
-      毎時 0分に朝礼・30分にランチが自動で開かれ、ゲームが少しずつ育ちます。
-    </div>
-  </div>
+  function renderAgents(containerId, seats, roles){
+    const c = document.getElementById(containerId);
+    c.innerHTML = '';
+    const nodes = {};
+    roles.forEach((role,i)=>{
+      const node = buildAgent(role, seats[role]);
+      node.dataset.delay = i*120;
+      c.appendChild(node);
+      nodes[role] = node;
+    });
+    return nodes;
+  }
 
-  <!-- toast -->
-  <div id="toast" style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:90;display:none;">
-    <div style="background:#2b2b3a;color:#fffdf8;border-radius:16px;padding:14px 22px;font-weight:800;font-size:.95rem;box-shadow:0 8px 24px rgba(43,43,58,.4);animation:toastIn .4s ease both;display:flex;align-items:center;gap:10px;">
-      <span style="font-size:1.3rem;">📨</span><span id="toastText">エージェントに伝えました！</span>
-    </div>
-  </div>
+  function seatIn(nodes){
+    Object.values(nodes).forEach((n,i)=>{
+      setTimeout(()=>{ n.style.transform='translateY(0)'; n.style.opacity='1'; }, i*140);
+    });
+  }
 
-  <script>
-    const REPO_OWNER = 'miyagoshigotono-lgtm';
-    const REPO_NAME  = 'game-kaihatubu';
-    const REPO_REF   = 'main';
+  async function playScript(nodes, turns){
+    // 全吹き出し非表示
+    Object.values(nodes).forEach(n=>{ n.querySelector('.bubble').style.display='none'; });
+    for(const turn of turns){
+      const node = nodes[turn.role];
+      if(!node) continue;
+      Object.values(nodes).forEach(n=>{ n.querySelector('.bubble').style.display='none'; });
+      const b = node.querySelector('.bubble');
+      node.querySelector('.bubble-text').textContent = turn.line;
+      b.style.display='block';
+      b.style.animation='none'; void b.offsetWidth; b.style.animation='pop .35s ease both';
+      await sleep(Math.max(1400, Math.min(4000, turn.line.length*90)));
+    }
+  }
 
-    // ===== ユーティリティ =====
-    function esc(s) {
-      return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function burstConfetti(){
+    const el=document.getElementById('confetti');
+    const colors=['#ff8a3d','#54c267','#3aa0ff','#9b6bff','#ffcb2b','#ff5b5b'];
+    el.innerHTML='';
+    for(let i=0;i<24;i++){
+      const d=document.createElement('div');
+      const x=Math.random()*720, dur=1.6+Math.random()*1.4, delay=Math.random()*0.6;
+      d.style.cssText=`position:absolute;left:${x}px;top:0;width:10px;height:14px;background:${colors[i%colors.length]};border-radius:2px;animation:fall ${dur}s linear ${delay}s 1;`;
+      el.appendChild(d);
     }
-    // ログのtimestampは既にJST（YYYY-MM-DD HH:mm）で記録されているため、
-    // タイムゾーン変換はせず「MM/DD HH:mm」へ整形するだけにする。
-    function toJST(ts) {
-      if (!ts) return '';
-      const m = String(ts).match(/^\d{4}-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
-      if (!m) return ts;
-      return `${m[1]}/${m[2]} ${m[3]}:${m[4]}`;
-    }
-    function todayJST() {
-      const d = new Date(Date.now() + 9*60*60*1000);
-      const p = n => String(n).padStart(2,'0');
-      return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`;
-    }
-    async function fetchJson(path) {
-      const res = await fetch(path + '?t=' + Date.now(), { cache: 'no-store' });
-      if (!res.ok) throw new Error(`${path} の取得に失敗（${res.status}）`);
-      return res.json();
-    }
-    const SECTION_JP = { CONFIG:'設定', STATE:'状態', ECOSYSTEM:'生態系', INIT_INPUT:'入力', UPDATE:'更新処理', RENDER:'描画' };
+    el.style.display='block';
+    setTimeout(()=>{ el.style.display='none'; el.innerHTML=''; }, 3500);
+  }
 
-    // ===== トースト =====
-    let toastTimer = null;
-    function showToast(msg) {
-      const t = document.getElementById('toast');
-      if (msg) document.getElementById('toastText').textContent = msg;
-      t.style.display = 'block';
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3500);
-    }
+  // ===== データ状態 =====
+  let LOGS = [];
+  let LATEST = null;
+  let TRANSCRIPT = null;  // 将来 transcript.json
+  let GOSSIP = null;      // 将来 gossip.json
 
-    // ===== トークン管理 =====
-    const statusEl = document.getElementById('statusMsg');
-    function setStatus(msg, kind) {
-      statusEl.textContent = msg || '';
-      statusEl.className = 'status-line' + (kind ? ' ' + kind : '');
-    }
-    function updateTokenState() {
-      const el = document.getElementById('tokenState');
-      const t = localStorage.getItem('gh_pat');
-      el.textContent = t ? `（保存済: ${t.slice(0,4)}…${t.slice(-4)}）` : '（未設定）';
-    }
-    function resetToken() {
-      localStorage.removeItem('gh_pat');
-      updateTokenState();
-      setStatus('トークンを削除しました。次回実行時に再入力してください。', '');
-    }
-    function getOrAskToken() {
-      let t = localStorage.getItem('gh_pat');
-      if (!t) {
-        t = prompt('GitHub Personal Access Token を入力してください\n\n■ Classic PAT（推奨）\n  Settings → Developer settings → Tokens (classic)\n  スコープ:「repo」にチェック（朝礼/ランチの実行と、おねがいの保存の両方に必要）');
-        if (t) { localStorage.setItem('gh_pat', t.trim()); updateTokenState(); }
-      }
-      return t ? t.trim() : '';
-    }
-
-    // ===== ワークフロー手動実行 =====
-    async function dispatchWorkflow(file) {
-      const token = getOrAskToken();
-      if (!token) { setStatus('トークンが未入力のため中止しました。', 'ng'); return; }
-      document.getElementById('btnMorning').disabled = true;
-      document.getElementById('btnLunch').disabled = true;
-      setStatus('実行をリクエスト中…');
-      try {
-        const res = await fetch(
-          `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${file}/dispatches`,
-          { method:'POST', headers:{ 'Authorization':`Bearer ${token}`, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' },
-            body: JSON.stringify({ ref: REPO_REF }) }
-        );
-        if (res.status === 204) {
-          setStatus('会議を始めました！数分後にリロードすると結果が反映されます。', 'ok');
-          showToast(file.includes('morning') ? '☀️ 朝礼を始めました！' : '🍱 ランチを始めました！');
-        } else if (res.status === 401) {
-          localStorage.removeItem('gh_pat'); updateTokenState();
-          setStatus('認証失敗（401）— トークンが無効か期限切れです。リセットして再入力してください。', 'ng');
-        } else if (res.status === 403) {
-          setStatus('権限不足（403）— Classic PAT は「repo」スコープが必要です。リセットして再発行してください。', 'ng');
-        } else {
-          let detail = '';
-          try { detail = (await res.json()).message || ''; } catch (e) {}
-          setStatus(`失敗（HTTP ${res.status}）${detail ? ': ' + detail : ''}`, 'ng');
-        }
-      } catch (e) {
-        setStatus('ネットワークエラー: ' + e.message, 'ng');
-      } finally {
-        document.getElementById('btnMorning').disabled = false;
-        document.getElementById('btnLunch').disabled = false;
-      }
-    }
-    function reloadGame() {
-      const f = document.getElementById('gameFrame');
-      f.src = f.src;
-    }
-
-    // ===== おねがい（user_intent.json）をAPIでコミット =====
-    function setIntentStatus(msg, kind) {
-      const el = document.getElementById('intentStatus');
-      el.textContent = msg || '';
-      el.className = 'status-line' + (kind ? ' ' + kind : '');
-    }
-    function b64encodeUtf8(str) { return btoa(unescape(encodeURIComponent(str))); }
-    function b64decodeUtf8(b64) { return decodeURIComponent(escape(atob(b64.replace(/\n/g,'')))); }
-
-    async function sendIntent() {
-      const text = document.getElementById('intentDraft').value.trim();
-      if (!text) { setIntentStatus('おねがいを入力してください。', 'ng'); return; }
-      const token = getOrAskToken();
-      if (!token) { setIntentStatus('トークンが未入力のため中止しました。', 'ng'); return; }
-      const btn = document.getElementById('btnSend');
-      btn.disabled = true;
-      setIntentStatus('送信中…');
-      const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/user_intent.json`;
-      const headers = { 'Authorization':`Bearer ${token}`, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' };
-      try {
-        // 現在のファイルとSHAを取得
-        let sha = null, existing = {};
-        const getRes = await fetch(`${apiUrl}?ref=${REPO_REF}&t=${Date.now()}`, { headers, cache:'no-store' });
-        if (getRes.ok) {
-          const j = await getRes.json();
-          sha = j.sha;
-          try { existing = JSON.parse(b64decodeUtf8(j.content)); } catch (e) { existing = {}; }
-        }
-        const payload = Object.assign({}, existing, { intent: text, updated: todayJST() });
-        const newContent = JSON.stringify(payload, null, 2) + '\n';
-        const body = { message: 'おねがいを更新（開発室UIから）', content: b64encodeUtf8(newContent), branch: REPO_REF };
-        if (sha) body.sha = sha;
-        const putRes = await fetch(apiUrl, { method:'PUT', headers, body: JSON.stringify(body) });
-        if (putRes.ok) {
-          setIntentStatus('', '');
-          document.getElementById('intentCurrent').textContent = text;
-          showToast('📨 おねがいを送りました！次の朝礼で反映されます');
-        } else if (putRes.status === 401) {
-          localStorage.removeItem('gh_pat'); updateTokenState();
-          setIntentStatus('認証失敗（401）— トークンをリセットして再入力してください。', 'ng');
-        } else if (putRes.status === 403 || putRes.status === 404) {
-          setIntentStatus('権限不足（403/404）— Classic PAT に「repo」スコープが必要です。上の「GitHubで直接編集」からでも保存できます。', 'ng');
-        } else if (putRes.status === 409) {
-          setIntentStatus('競合（409）— 直前に更新されました。もう一度送ってください。', 'ng');
-        } else {
-          let detail = '';
-          try { detail = (await putRes.json()).message || ''; } catch (e) {}
-          setIntentStatus(`保存失敗（HTTP ${putRes.status}）${detail ? ': ' + detail : ''}`, 'ng');
-        }
-      } catch (e) {
-        setIntentStatus('ネットワークエラー: ' + e.message, 'ng');
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    // ===== おねがいチップ =====
-    const CHIPS = [
-      'もっと可愛く', 'ボス戦を派手に', '魔物に個性を', 'エフェクトを豪華に',
-      '色をカラフルに', '音が鳴るように', '勇者を強く', 'UIを見やすく'
+  // ===== 会議室 =====
+  function meetingTurnsFromLog(log){
+    const sec = SECTION_JP[log && log.target_section] || (log && log.target_section) || 'ゲーム';
+    const ok = log && log.result === 'success';
+    const task = (log && log.task) ? String(log.task) : '';
+    const taskShort = task ? task.slice(0,40) : 'いろいろ';
+    return [
+      { role:'director',   line:`さあ、今日の開発会議を始めよう。テーマは「${sec}」だ。` },
+      { role:'qa',         line: ok ? '前回の動作チェック、問題なしでした！' : '前回はここがうまく動かなくて…要注意です。' },
+      { role:'programmer', line:`${taskShort}…を実装してみたよ。` },
+      { role:'qa',         line: ok ? 'うん、ちゃんと動いてる。合格！' : 'もう一息！ここを直そう。' },
+      { role:'director',   line: ok ? 'いいぞ。今日も一歩前進だ。' : '次こそ仕上げよう。みんな頼んだ。' }
     ];
-    function renderChips() {
-      const row = document.getElementById('chipRow');
-      row.innerHTML = CHIPS.map(c => `<button class="chip" data-chip="${esc(c)}">＋ ${esc(c)}</button>`).join('');
-      row.querySelectorAll('button').forEach(b => {
-        b.onclick = () => {
-          const ta = document.getElementById('intentDraft');
-          const add = b.getAttribute('data-chip') + 'してほしい。';
-          ta.value = (ta.value.trim() ? ta.value.trim() + ' ' : '') + add;
-          ta.focus();
-        };
-      });
+  }
+  async function playMeeting(){
+    const btn=document.getElementById('btnMeeting'); btn.disabled=true;
+    document.getElementById('meetingEmpty').style.display='none';
+    const roles=['director','programmer','qa','pr'];
+    const nodes=renderAgents('meetingAgents', MEETING_SEATS, roles);
+    seatIn(nodes);
+    await sleep(900);
+    const turns = (TRANSCRIPT && Array.isArray(TRANSCRIPT.turns) && TRANSCRIPT.turns.length)
+      ? TRANSCRIPT.turns
+      : meetingTurnsFromLog(LATEST);
+    await playScript(nodes, turns);
+    const ok = TRANSCRIPT ? TRANSCRIPT.success : (LATEST && LATEST.result==='success');
+    if(ok) burstConfetti();
+    btn.disabled=false;
+  }
+
+  // ===== オフィス（雑談） =====
+  function gossipTurns(){
+    const r = lsGet('ratings_'+todayStr(), null);
+    const lowSat = r && r.satisfaction && r.satisfaction <= 2;
+    const treats = lsGet('treatsGiven', []);
+    const streak = lsGet('streakCount', 1);
+    const t = [];
+    t.push({ role:'programmer', line:'あ、社長だ。今日も来てくれたんだね。' });
+    if(treats.length) t.push({ role:'pr', line:`この前の差し入れ、おいしかった〜！ありがとう。` });
+    else t.push({ role:'pr', line:'差し入れ…ちょっと待ってたり、して。なんてね。' });
+    if(lowSat) t.push({ role:'qa', line:'昨日の評価、きびしかったね…！でも逆に燃えるよ。' });
+    else t.push({ role:'qa', line:'最近うまくいってる気がするんだ、ね。' });
+    t.push({ role:'director', line:`${streak}日も通ってくれて、チーム一同 感謝してるよ。` });
+    return t;
+  }
+  async function peekOffice(){
+    const btn=document.getElementById('btnPeek'); btn.disabled=true;
+    const roles=['director','programmer','qa','pr'];
+    const nodes=renderAgents('officeAgents', OFFICE_SEATS, roles);
+    seatIn(nodes);
+    await sleep(700);
+    const turns = (GOSSIP && Array.isArray(GOSSIP.turns) && GOSSIP.turns.length) ? GOSSIP.turns : gossipTurns();
+    await playScript(nodes, turns);
+    btn.disabled=false;
+  }
+
+  // ===== 差し入れ =====
+  function renderTreatTable(){
+    const given = lsGet('treatsGiven', []);
+    document.getElementById('treatTable').innerHTML =
+      given.slice(-5).map(e=>`<span style="animation:treatPop .5s ease both;">${esc(e)}</span>`).join('');
+  }
+  async function openTreatPicker(){
+    const inv = getInventory();
+    const owned = Object.keys(inv).filter(k=>inv[k].count>0);
+    if(!owned.length){ document.getElementById('officeStatus').textContent='もちものがありません。明日のログインで配給されます。'; document.getElementById('officeStatus').className='status-line ng'; return; }
+    const key = owned[0];
+    inv[key].count--;
+    setInventory(inv);
+    const given = lsGet('treatsGiven', []); given.push(inv[key].emoji); lsSet('treatsGiven', given.slice(-20));
+    renderTreatTable(); renderInventory();
+    document.getElementById('officeStatus').textContent='';
+    await sendToBackend('treat', { emoji: inv[key].emoji, name: inv[key].name, date: todayStr() });
+    showToast(`${inv[key].emoji} 差し入れしました！みんな喜んでいます`, '🍡');
+    // ごきげんな一言
+    const roles=['director','programmer','qa','pr'];
+    const nodes=renderAgents('officeAgents', OFFICE_SEATS, roles);
+    seatIn(nodes); await sleep(700);
+    await playScript(nodes, [
+      { role:'programmer', line:`わ、${inv[key].name}だ！いただきます！` },
+      { role:'qa', line:'やる気でてきた〜！' }
+    ]);
+  }
+
+  // ===== 付箋（指示） =====
+  function renderNotes(){
+    const notes = lsGet('notes', []);
+    const board = document.getElementById('noteBoard');
+    if(!notes.length){ board.innerHTML='<span style="font-size:.8rem;font-weight:600;color:#b8a784;align-self:center;margin:0 auto;">まだ付箋はありません</span>'; return; }
+    const colors=['#fff6a8','#ffd6a8','#c8f0c0','#bfe3ff','#f3c8e0'];
+    board.innerHTML = notes.slice(-8).reverse().map((n,i)=>{
+      const rot=(((i*7)%9)-4);
+      return `<div style="position:relative;width:150px;background:${colors[i%colors.length]};border:2.5px solid #2b2b3a;border-radius:6px;padding:9px 11px;font-size:.8rem;font-weight:700;line-height:1.45;box-shadow:0 4px 0 rgba(43,43,58,.16);transform:rotate(${rot}deg);animation:noteDrop .5s ease both;">
+        <div style="position:absolute;left:50%;top:-7px;transform:translateX(-50%);width:26px;height:9px;background:#ffffffaa;border:1.5px solid #2b2b3a;border-radius:2px;"></div>
+        ${esc(n.text)}</div>`;
+    }).join('');
+  }
+  async function placeNote(){
+    const ta=document.getElementById('draft');
+    const text=ta.value.trim();
+    const st=document.getElementById('noteStatus');
+    if(!text){ st.textContent='指示を入力してください。'; st.className='status-line ng'; return; }
+    const notes=lsGet('notes',[]); notes.push({ text, date: todayStr() }); lsSet('notes', notes.slice(-30));
+    ta.value=''; renderNotes(); st.textContent='';
+    const r=await sendToBackend('note',{ text, date: todayStr() });
+    showToast(r.local ? '付箋を机に置きました（この端末に保存）' : '付箋を置きました！次の会議で反映されます', '📌');
+  }
+
+  // ===== 評価（2軸★） =====
+  const RATING_DEFS = [
+    { key:'reflection',   label:'指示の反映度（私の声、聞いてくれた？）' },
+    { key:'satisfaction', label:'出来栄えの満足度（今日のゲーム、どう？）' }
+  ];
+  function renderRatings(){
+    const saved = lsGet('ratings_'+todayStr(), {});
+    const wrap=document.getElementById('ratingRows');
+    wrap.innerHTML = RATING_DEFS.map(def=>{
+      const val = saved[def.key]||0;
+      const stars = [1,2,3,4,5].map(n=>
+        `<button onclick="setRating('${def.key}',${n})" style="font-family:inherit;cursor:pointer;background:none;border:none;padding:2px;font-size:1.7rem;line-height:1;color:${n<=val?'#ffb43d':'#e3d8c4'};transition:transform .12s;">★</button>`
+      ).join('');
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;flex-wrap:wrap;">
+        <div style="font-size:.86rem;font-weight:700;">${esc(def.label)}</div>
+        <div style="display:flex;gap:4px;" data-rating="${def.key}">${stars}</div></div>`;
+    }).join('');
+  }
+  async function setRating(key, n){
+    const saved = lsGet('ratings_'+todayStr(), {});
+    saved[key]=n; lsSet('ratings_'+todayStr(), saved);
+    renderRatings();
+    const st=document.getElementById('ratingStatus');
+    const r=await sendToBackend('rating',{ ...saved, date: todayStr() });
+    st.textContent = r.local ? 'この端末に評価を記録しました。' : '評価を送りました！明日の開発に反映されます。';
+    st.className='status-line';
+    showToast('⭐ 評価ありがとう！', '⭐');
+  }
+
+  // ===== もちもの（ログインボーナス） =====
+  const ITEM_POOL = [
+    { key:'dango', emoji:'🍡', name:'だんご' },
+    { key:'manju', emoji:'🥮', name:'まんじゅう' },
+    { key:'cookie', emoji:'🍪', name:'クッキー' },
+    { key:'onigiri', emoji:'🍙', name:'おにぎり' },
+    { key:'coffee', emoji:'☕', name:'コーヒー' }
+  ];
+  function getInventory(){
+    const inv = lsGet('inventory', null);
+    if(inv) return inv;
+    const fresh={}; ITEM_POOL.forEach(it=>fresh[it.key]={emoji:it.emoji,name:it.name,count:0});
+    return fresh;
+  }
+  function setInventory(inv){ lsSet('inventory', inv); }
+  function grantDailyItem(){
+    const last = lsGet('lastGrant', '');
+    const today = todayStr();
+    if(last === today) return;
+    const inv = getInventory();
+    // 日替わりで1種類配給
+    const idx = (new Date(today).getDate()) % ITEM_POOL.length;
+    const it = ITEM_POOL[idx];
+    if(!inv[it.key]) inv[it.key]={emoji:it.emoji,name:it.name,count:0};
+    inv[it.key].count += 2;
+    setInventory(inv);
+    lsSet('lastGrant', today);
+  }
+  function renderInventory(){
+    const inv=getInventory();
+    const grid=document.getElementById('inventoryGrid');
+    grid.innerHTML = ITEM_POOL.map(it=>{
+      const c = inv[it.key]?inv[it.key].count:0;
+      return `<div style="background:#fff7e8;border:2.5px solid #2b2b3a;border-radius:14px;padding:10px 6px;text-align:center;box-shadow:0 4px 0 rgba(43,43,58,.12);opacity:${c?1:.45};">
+        <div style="font-size:1.9rem;line-height:1;">${it.emoji}</div>
+        <div style="font-size:.74rem;font-weight:800;margin-top:5px;">${esc(it.name)}</div>
+        <div style="font-size:.68rem;font-weight:700;color:#c79a4e;">×${c}</div></div>`;
+    }).join('');
+  }
+  function renderHeaderItems(){
+    const inv=getInventory();
+    const owned = ITEM_POOL.filter(it=>inv[it.key]&&inv[it.key].count>0).slice(0,3);
+    document.getElementById('headerItems').innerHTML = owned.length
+      ? owned.map(it=>`<span style="font-size:.82rem;font-weight:800;display:flex;align-items:center;gap:2px;">${it.emoji}<span style="font-size:.72rem;color:#9a8f7e;">${inv[it.key].count}</span></span>`).join('')
+      : '<span style="font-size:.72rem;color:#9a8f7e;">もちもの なし</span>';
+  }
+
+  // ===== 連続ログイン =====
+  function updateStreak(){
+    const today=todayStr();
+    const last=lsGet('lastVisit','');
+    let streak=lsGet('streakCount',0);
+    if(last!==today){
+      const y=new Date(Date.now()+9*36e5 - 864e5); const p=n=>String(n).padStart(2,'0');
+      const yStr=`${y.getUTCFullYear()}-${p(y.getUTCMonth()+1)}-${p(y.getUTCDate())}`;
+      streak = (last===yStr) ? streak+1 : 1;
+      lsSet('streakCount',streak); lsSet('lastVisit',today);
     }
+    document.getElementById('streakText').textContent = `${streak||1}日 連続`;
+  }
 
-    // ===== 意図の表示 =====
-    function renderIntent(data) {
-      const text = (data && data.intent) ? String(data.intent).trim() : '';
-      const cur = document.getElementById('intentCurrent');
-      const draft = document.getElementById('intentDraft');
-      if (text) {
-        cur.textContent = text;
-        if (!draft.value) draft.value = text;
-      } else {
-        cur.textContent = 'まだ設定されていません。下に書いて送ってみよう！';
-        cur.style.color = '#b3a890';
-      }
-    }
+  // ===== 初期ロード =====
+  (async function init(){
+    updateStreak();
+    grantDailyItem();
+    renderInventory(); renderHeaderItems(); renderTreatTable();
+    renderNotes(); renderRatings();
 
-    // ===== ヘッダーのピル =====
-    function renderHeader(logs) {
-      const success = logs.filter(l => l.result === 'success').length;
-      document.getElementById('pillCycle').textContent = logs.length || 0;
-      document.getElementById('pillSuccess').textContent = success;
-      const last = logs[logs.length - 1];
-      document.getElementById('pillUpdated').textContent = last ? `${toJST(last.timestamp)} 更新` : '更新なし';
-    }
+    // ログ読込（議題・会議のフォールバック内容）
+    try{
+      const logs = await fetchJson('logs.json');
+      LOGS = Array.isArray(logs)?logs:[];
+      LATEST = LOGS.length?LOGS[LOGS.length-1]:null;
+    }catch(e){ LOGS=[]; LATEST=null; }
 
-    // ===== 会議室ステージ =====
-    function renderStage(logs) {
-      const agentsEl = document.getElementById('agents');
-      const emptyEl = document.getElementById('roomEmpty');
-      const kicker = document.getElementById('boardKicker');
-      const title = document.getElementById('boardTitle');
+    // 将来のデータ（無ければフォールバック）
+    try{ TRANSCRIPT = await fetchJson('transcript.json'); }catch(e){ TRANSCRIPT=null; }
+    try{ GOSSIP = await fetchJson('gossip.json'); }catch(e){ GOSSIP=null; }
 
-      if (!logs.length) {
-        emptyEl.style.display = 'block';
-        agentsEl.innerHTML = '';
-        kicker.textContent = '会議室';
-        title.textContent = 'まだ会議は開かれていません';
-        document.getElementById('stageHint').textContent = 'ボタンを押すと会議が始まるよ';
-        return;
-      }
-      emptyEl.style.display = 'none';
-      const last = logs[logs.length - 1];
-      const sec = SECTION_JP[last.target_section] || last.target_section || '？';
-      const isOk = last.result === 'success';
-      const typeLabel = last.cycle_type === 'morning' ? '朝礼' : 'ランチ';
-      const typeIcon  = last.cycle_type === 'morning' ? '☀️' : '🍱';
+    // 議題表示
+    const agenda = document.getElementById('agendaText');
+    if(TRANSCRIPT && TRANSCRIPT.agenda){ agenda.textContent = TRANSCRIPT.agenda; }
+    else if(LATEST){
+      const sec = SECTION_JP[LATEST.target_section] || LATEST.target_section || '';
+      agenda.textContent = sec ? `「${sec}」まわりの改善` : (LATEST.task||'開発を進める').slice(0,40);
+      document.getElementById('meetingHint').textContent = `最新：${fmtTime(LATEST.timestamp)} の会議`;
+    } else { agenda.textContent = 'まだ会議は開かれていません'; }
 
-      kicker.textContent = `${typeIcon} ${typeLabel}の議題`;
-      title.textContent = `「${sec}」を改善する`;
-      document.getElementById('stageHint').textContent = `最新：${toJST(last.timestamp)} の${typeLabel}`;
+    // デフォルト表示は会議室
+    showRoom('meeting');
+  })();
 
-      const taskShort = (last.task || '').slice(0, 24) || 'コードを書いたよ';
-      const agents = [
-        { name:'司令塔', color:'#ff8a3d', left:120, top:140, line:`今回は「${sec}」を直そう！`, z:5 },
-        { name:'プログラマー', color:'#3aa0ff', left:332, top:96, line:`${taskShort}…`, z:4 },
-        { name:'QA', color: isOk ? '#54c267' : '#e2566a', left:544, top:140,
-          line: isOk ? 'OK！合格だよ✨' : 'ここを直して！', z:5 }
-      ];
-
-      agentsEl.innerHTML = agents.map((ag, i) => `
-        <div style="position:absolute;left:${ag.left}px;top:${ag.top}px;width:96px;z-index:${ag.z};">
-          <div style="position:absolute;left:50%;bottom:104px;transform:translateX(-50%);width:190px;background:#fffdf8;border:3px solid #2b2b3a;border-radius:14px;padding:8px 12px;font-size:.78rem;font-weight:700;line-height:1.4;box-shadow:0 5px 0 rgba(43,43,58,.18);text-align:center;animation:pop .35s ease both;animation-delay:${i*0.12}s;z-index:20;">
-            ${esc(ag.line)}
-            <div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:11px solid #2b2b3a;"></div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:5px;animation:bobMove 1.6s ease-in-out infinite;animation-delay:${i*0.2}s;">
-            <div style="position:relative;width:62px;height:60px;background:${ag.color};border:3px solid #2b2b3a;border-radius:20px;box-shadow:0 5px 0 rgba(43,43,58,.18);">
-              <div style="position:absolute;left:50%;top:-9px;transform:translateX(-50%);width:30px;height:13px;background:${ag.color};border:3px solid #2b2b3a;border-bottom:none;border-radius:14px 14px 0 0;"></div>
-              <div style="position:absolute;left:11px;top:20px;width:14px;height:14px;background:#fffdf8;border:2px solid #2b2b3a;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:blink 4s infinite;"><div style="width:5px;height:5px;background:#2b2b3a;border-radius:50%;"></div></div>
-              <div style="position:absolute;right:11px;top:20px;width:14px;height:14px;background:#fffdf8;border:2px solid #2b2b3a;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:blink 4s infinite;"><div style="width:5px;height:5px;background:#2b2b3a;border-radius:50%;"></div></div>
-              <div style="position:absolute;left:50%;top:40px;transform:translateX(-50%);width:14px;height:7px;border:2px solid #2b2b3a;border-top:none;border-radius:0 0 10px 10px;"></div>
-            </div>
-            <div style="background:#fffdf8;border:2px solid #2b2b3a;border-radius:999px;padding:1px 9px;font-size:.7rem;font-weight:800;box-shadow:0 3px 0 rgba(43,43,58,.14);white-space:nowrap;">${esc(ag.name)}</div>
-          </div>
-        </div>`).join('');
-    }
-
-    // ===== 開発ログ =====
-    function renderLogs(logs) {
-      const el = document.getElementById('logList');
-      const countEl = document.getElementById('logCount');
-      if (!logs.length) {
-        el.innerHTML = '<div style="text-align:center;color:#b3a890;font-weight:500;padding:20px;">まだログがありません。</div>';
-        return;
-      }
-      countEl.textContent = `（${logs.length}件）`;
-      const sorted = logs.slice().reverse();
-      el.innerHTML = sorted.map(l => {
-        const isOk = l.result === 'success';
-        const typeLabel = l.cycle_type === 'morning' ? '朝礼' : 'ランチ';
-        const icon = l.cycle_type === 'morning' ? '☀️' : '🍱';
-        const typeBg = l.cycle_type === 'morning' ? '#ffe2c4' : '#d6f0d8';
-        const resBg = isOk ? '#d6f0d8' : '#ffd9d6';
-        const resLabel = isOk ? '成功' : '失敗';
-        const sec = SECTION_JP[l.target_section] ? `${SECTION_JP[l.target_section]}（${l.target_section}）` : (l.target_section || '');
-        const task = esc(l.task || l.priority || l.changes || '（詳細なし）');
-        const ts = esc(toJST(l.timestamp));
-        const bodyLines = [];
-        if (sec) bodyLines.push(`対象: ${sec}`);
-        if (l.task) bodyLines.push(`おねがい/タスク: ${l.task}`);
-        if (l.changes && l.changes !== l.task) bodyLines.push(`実装: ${l.changes}`);
-        if (l.qa_note) bodyLines.push(`QA: ${l.qa_note}`);
-        if (l.retry_count) bodyLines.push(`リトライ: ${l.retry_count}回`);
-        const body = esc(bodyLines.join('\n'));
-        return `
-        <details style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:16px;overflow:hidden;box-shadow:0 4px 0 rgba(43,43,58,.12);">
-          <summary style="list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:9px;font-size:.9rem;font-weight:700;">
-            <span style="font-size:1.1rem;">${icon}</span>
-            <span style="font-size:.72rem;padding:2px 10px;border-radius:999px;font-weight:800;border:2px solid #2b2b3a;background:${typeBg};">${typeLabel}</span>
-            <span style="font-size:.72rem;padding:2px 10px;border-radius:999px;font-weight:800;border:2px solid #2b2b3a;background:${resBg};">${resLabel}</span>
-            <span style="flex:1;color:#4a4458;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">${task}</span>
-            <span style="font-size:.74rem;color:#b3a890;white-space:nowrap;font-weight:500;">${ts}</span>
-          </summary>
-          <div style="padding:12px 16px;font-size:.84rem;color:#5a5468;line-height:1.7;white-space:pre-wrap;border-top:2px solid #f0e6d4;font-weight:500;">${body}</div>
-        </details>`;
-      }).join('');
-    }
-
-    // ===== 初期ロード =====
-    (async function init() {
-      updateTokenState();
-      renderChips();
-      try {
-        const intent = await fetchJson('user_intent.json');
-        renderIntent(intent);
-      } catch (e) { renderIntent(null); }
-      try {
-        const logs = await fetchJson('logs.json');
-        const arr = Array.isArray(logs) ? logs : [];
-        renderHeader(arr);
-        renderStage(arr);
-        renderLogs(arr);
-      } catch (e) {
-        document.getElementById('logList').innerHTML =
-          `<div style="text-align:center;color:#d24b4b;font-weight:600;padding:20px;">${esc(e.message)}</div>`;
-        renderStage([]);
-      }
-    })();
-  </script>
+  function reloadGame(){ const f=document.getElementById('gameFrame'); f.src=f.src; }
+</script>
 </body>
 </html>
