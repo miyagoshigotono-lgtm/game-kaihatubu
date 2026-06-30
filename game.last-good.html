@@ -392,7 +392,6 @@ function render() {
       if (c.wall) {
         ctx.fillStyle = COLORS.wall;
         ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-        // テクスチャ風ノイズ（矩形分割による岩肌表現）
         ctx.fillStyle = COLORS.wallEdge;
         ctx.fillRect(x * TILE + 2, y * TILE + 2, TILE / 2 - 2, TILE / 2 - 2);
         ctx.fillRect(x * TILE + TILE / 2 + 1, y * TILE + TILE / 2 + 1, TILE / 2 - 2, TILE / 2 - 2);
@@ -405,7 +404,7 @@ function render() {
     }
   }
 
-  // 魔物：草食(円) / 肉食(三角形)
+  // 魔物
   for (const m of game.monsters) {
     const cx = m.x * TILE + TILE / 2;
     const cy = m.y * TILE + TILE / 2;
@@ -430,8 +429,12 @@ function render() {
     ctx.fillRect(h.x * TILE + TILE * 0.3, h.y * TILE + TILE * 0.25, TILE * 0.1, TILE * 0.1);
   }
 
-  // 魔王（プレイヤー）
+  // 魔王（プレイヤー）のパルスエフェクト
   const px = game.player.x * TILE, py = game.player.y * TILE;
+  const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
+  ctx.save();
+  ctx.shadowColor = COLORS.player;
+  ctx.shadowBlur = 10 + pulse * 15;
   ctx.fillStyle = COLORS.player;
   ctx.beginPath();
   ctx.moveTo(px + TILE / 2, py + TILE * 0.1);
@@ -439,6 +442,7 @@ function render() {
   ctx.lineTo(px + TILE / 2, py + TILE * 0.9);
   ctx.lineTo(px + TILE * 0.1, py + TILE / 2);
   ctx.fill();
+  ctx.restore();
 
   // パーティクル
   for (const p of game.particles) {
