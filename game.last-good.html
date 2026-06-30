@@ -332,7 +332,6 @@ function update(dt) {
 // ===END:UPDATE===
 
 // ===SECTION:RENDER===
-// Canvas描画。地形・魔物・勇者・魔王・パーティクル・HUD。
 function render() {
   const W = COLS * TILE, H = ROWS * TILE;
   ctx.clearRect(0, 0, W, H + HUD);
@@ -342,54 +341,85 @@ function render() {
     for (let y = 0; y < ROWS; y++) {
       const c = game.map[x] && game.map[x][y];
       if (!c) continue;
-      ctx.fillStyle = c.wall ? COLORS.wall : COLORS.ground;
-      ctx.fillRect(x * TILE, y * TILE, TILE - 1, TILE - 1);
-      if (c.wall) { ctx.fillStyle = COLORS.wallEdge; ctx.fillRect(x * TILE, y * TILE, TILE - 1, 3); }
+      
+      if (c.wall) {
+        ctx.fillStyle = COLORS.wall;
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        // テクスチャ風ノイズ（矩形分割による岩肌表現）
+        ctx.fillStyle = COLORS.wallEdge;
+        ctx.fillRect(x * TILE + 2, y * TILE + 2, TILE / 2 - 2, TILE / 2 - 2);
+        ctx.fillRect(x * TILE + TILE / 2 + 1, y * TILE + TILE / 2 + 1, TILE / 2 - 2, TILE / 2 - 2);
+      } else {
+        ctx.fillStyle = COLORS.ground;
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.strokeRect(x * TILE, y * TILE, TILE, TILE);
+      }
     }
   }
 
-  // 魔物
+  // 魔物：草食(円) / 肉食(三角形)
   for (const m of game.monsters) {
-    ctx.fillStyle = m.type === 1 ? COLORS.predator : COLORS.prey;
+    const cx = m.x * TILE + TILE / 2;
+    const cy = m.y * TILE + TILE / 2;
+    ctx.fillStyle = (m.type === 1) ? COLORS.predator : COLORS.prey;
     ctx.beginPath();
-    ctx.arc(m.x * TILE + TILE / 2, m.y * TILE + TILE / 2, TILE * 0.30, 0, Math.PI * 2);
+    if (m.type === 1) {
+      ctx.moveTo(cx, cy - TILE * 0.35);
+      ctx.lineTo(cx + TILE * 0.35, cy + TILE * 0.35);
+      ctx.lineTo(cx - TILE * 0.35, cy + TILE * 0.35);
+    } else {
+      ctx.arc(cx, cy, TILE * 0.28, 0, Math.PI * 2);
+    }
+    ctx.closePath();
     ctx.fill();
   }
 
   // 勇者
   for (const h of game.heroes) {
     ctx.fillStyle = COLORS.hero;
-    ctx.fillRect(h.x * TILE + TILE * 0.25, h.y * TILE + TILE * 0.18, TILE * 0.5, TILE * 0.64);
+    ctx.fillRect(h.x * TILE + TILE * 0.2, h.y * TILE + TILE * 0.15, TILE * 0.6, TILE * 0.7);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(h.x * TILE + TILE * 0.3, h.y * TILE + TILE * 0.25, TILE * 0.1, TILE * 0.1);
   }
 
-  // 魔王（プレイヤー）：ひし形
+  // 魔王（プレイヤー）
   const px = game.player.x * TILE, py = game.player.y * TILE;
   ctx.fillStyle = COLORS.player;
   ctx.beginPath();
-  ctx.moveTo(px + TILE / 2, py + TILE * 0.10);
-  ctx.lineTo(px + TILE * 0.88, py + TILE / 2);
-  ctx.lineTo(px + TILE / 2, py + TILE * 0.90);
-  ctx.lineTo(px + TILE * 0.12, py + TILE / 2);
-  ctx.closePath();
+  ctx.moveTo(px + TILE / 2, py + TILE * 0.1);
+  ctx.lineTo(px + TILE * 0.9, py + TILE / 2);
+  ctx.lineTo(px + TILE / 2, py + TILE * 0.9);
+  ctx.lineTo(px + TILE * 0.1, py + TILE / 2);
   ctx.fill();
 
   // パーティクル
   for (const p of game.particles) {
     ctx.globalAlpha = Math.max(0, p.life);
     ctx.fillStyle = p.color;
-    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.globalAlpha = 1;
 
   // HUD
-  ctx.fillStyle = COLORS.hud;
+  ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(0, H, W, HUD);
+  ctx.strokeStyle = COLORS.hud;
+  ctx.strokeRect(0, H, W, HUD);
+  
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 14px "Courier New", monospace';
-  ctx.fillText('R' + game.round + '  掘削:' + game.digsLeft + '  魔物:' + game.monsters.length + '  勇者:' + game.heroes.length, 12, H + 26);
-  ctx.fillStyle = '#c9b8e8';
+  ctx.font = 'bold 16px "Courier New", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`ROUND: ${game.round}`, 20, H + 30);
+  ctx.fillText(`DIGS LEFT: ${game.digsLeft}`, 20, H + 55);
+  
   ctx.font = '12px "Courier New", monospace';
-  ctx.fillText(game.message || '', 12, H + 50);
+  ctx.fillStyle = '#888';
+  ctx.fillText(`MONSTERS: ${game.monsters.length} | HEROES: ${game.heroes.length}`, 200, H + 30);
+  ctx.fillStyle = '#c9b8e8';
+  ctx.fillText(game.message || '地下迷宮を掘り進め、生態系を築け。', 200, H + 55);
 }
 // ===END:RENDER===
 
