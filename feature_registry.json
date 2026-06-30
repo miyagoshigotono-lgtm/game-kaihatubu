@@ -9,13 +9,12 @@
     "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
   },
   "recent_sections": [
-    "STATE",
     "RENDER",
     "INIT_INPUT",
-    "ECOSYSTEM"
+    "ECOSYSTEM",
+    "UPDATE"
   ],
   "implemented_features": [
-    "[ECOSYSTEM] 遺伝子パラメータ（speed/metabolism/reproThreshold/size）による個体差",
     "[UPDATE] 捕食・繁殖・移動のメインループ",
     "[UPDATE] 勇者の栄養密度+魔物密度スコアによる自律侵攻AI",
     "[INIT_INPUT] クリック掘削・ラウンド制限・魔物自動生成・勇者出現トリガー",
@@ -44,7 +43,8 @@
     "[STATE] gameオブジェクト内に『キー入力キュー』と『移動・掘削の入力判定フラグ』を追加し、キー押下時に即座に状態を更新するのではなく、一度バッファに格納してからメイン…",
     "[RENDER] render()関数を刷新し、現在のgame.map[x][y]の状態（WALLならグレー、GROUNDなら黒、魔王位置なら発光エフェクト）をタイルベースで描画…",
     "[INIT_INPUT] キーボード入力イベントリスナーを刷新し、WASDキー押下時に『game.inputQueue』へ移動または掘削の意図をプッシュする処理を実装する。具体的には、プ…",
-    "[ECOSYSTEM] createMonster関数の実装を完了させる。引数(x, y, type, parentGenes, generation, parentId, nutri…"
+    "[ECOSYSTEM] createMonster関数の実装を完了させる。引数(x, y, type, parentGenes, generation, parentId, nutri…",
+    "[UPDATE] update(dt)関数内に、キー入力キューを消費して魔王の移動（WASDで隣接GROUNDへ）と掘削（隣接WALLをGROUNDへ変換しdigsLeftを減ら…"
   ],
   "failed_approaches": [
     "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",

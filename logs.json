@@ -528,5 +528,15 @@
     "task": "createMonster関数の実装を完了させる。引数(x, y, type, parentGenes, generation, parentId, nutrient)を受け取り、遺伝子情報（攻撃力・移動速度・捕食範囲）を栄養素量に基づいて突然変異(mutate関数)させ、生成された魔物オブジェクトをgame.monsters配列に追加する処理を記述する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-30 14:06",
+    "cycle_type": "morning",
+    "cycle_number": 15,
+    "result": "success",
+    "target_section": "UPDATE",
+    "task": "update(dt)関数内に、キー入力キューを消費して魔王の移動（WASDで隣接GROUNDへ）と掘削（隣接WALLをGROUNDへ変換しdigsLeftを減らす）を確定させるロジックを実装する。また、掘削成功時に周囲の栄養素を魔物生成用バッファに加算する処理を追加する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]
