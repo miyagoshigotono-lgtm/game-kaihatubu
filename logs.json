@@ -28,5 +28,15 @@
     "task": "render()関数を拡張し、以下の視覚情報を実装する。1. 採掘可能な壁と通行可能な地面を色分けし、壁にはテクスチャ風のノイズ（矩形分割）を描画する。2. 魔物をタイプ別に異なる形状（草食は緑の円、肉食は赤の三角形）で描画する。3. 画面下部のHUDに、現在のdigsLeftとround数をテキストで明示的に表示する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-30 21:54",
+    "cycle_type": "meeting",
+    "cycle_number": 4,
+    "result": "success",
+    "target_section": "STATE",
+    "task": "gameオブジェクト内に、採掘した壁の履歴を管理する二次元配列 `map[COLS][ROWS]` の初期化ロジックを追加し、`game.map[x][y] = { wall: true, health: 100 }` のように壁の耐久値や属性を保持できる構造へと拡張する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

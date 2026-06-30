@@ -48,25 +48,37 @@ function resize() {
 // ===END:CONFIG===
 
 // ===SECTION:STATE===
-// gameオブジェクト（唯一の状態の置き場）とマップ操作の基本ヘルパー。
 const game = {
   round: 1,
-  phase: 'dig',          // 'dig'（採掘中）| 'battle'（防衛戦）| 'over'（敗北）| 'win'（勝利）
+  phase: 'dig',
   digsLeft: 12,
   player: { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) },
-  map: [],               // map[x][y] = { wall:bool, filter:null }
+  map: Array.from({ length: COLS }, (_, x) =>
+    Array.from({ length: ROWS }, (_, y) => ({
+      wall: true,
+      health: 100,
+      type: 'rock',
+      lastDug: false
+    }))
+  ),
   monsters: [],
   heroes: [],
   particles: [],
-  message: ''
+  message: '魔王よ、迷宮を掘り進め、生態系を築くのだ。'
 };
 
 function inBounds(x, y) {
   return x >= 0 && x < COLS && y >= 0 && y < ROWS;
 }
+
 function isGround(x, y) {
-  return inBounds(x, y) && game.map[x] && game.map[x][y] && !game.map[x][y].wall;
+  return inBounds(x, y) && game.map[x][y] && !game.map[x][y].wall;
 }
+
+function getTile(x, y) {
+  return inBounds(x, y) ? game.map[x][y] : null;
+}
+
 function addParticle(x, y, color) {
   game.particles.push({
     x: x * TILE + TILE / 2,
