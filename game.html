@@ -24,9 +24,15 @@ const TILE_SIZE = Math.floor(Math.min(window.innerWidth / COLS, (window.innerHei
 let mouseX = 0;
 let mouseY = 0;
 
-const player = {
-    x: Math.floor(COLS / 2),
-    y: 0
+const game = {
+    map: [],
+    monsters: [],
+    heroes: [],
+    phase: 'MINING',
+    player: {
+        x: Math.floor(COLS / 2),
+        y: 0
+    }
 };
 
 const TILE_TYPES = {
@@ -36,22 +42,19 @@ const TILE_TYPES = {
 
 const FILTERS = { NONE: null, NURSERY: 'NURSERY', SANCTUARY: 'SANCTUARY', RESOURCE: 'RESOURCE' };
 
-let map = {};
-
 function initMap() {
-    map = {};
-    for (let y = 0; y < ROWS; y++) {
-        for (let x = 0; x < COLS; x++) {
-            const isPlayerStart = (x === player.x && y === player.y);
+    game.map = new Array(COLS);
+    for (let x = 0; x < COLS; x++) {
+        game.map[x] = new Array(ROWS);
+        for (let y = 0; y < ROWS; y++) {
+            const isPlayerStart = (x === game.player.x && y === game.player.y);
             const type = isPlayerStart ? TILE_TYPES.GROUND : TILE_TYPES.WALL;
             
-            map[`${x},${y}`] = {
+            game.map[x][y] = {
                 type: type.id,
                 hardness: type.hardness,
                 nutrient: isPlayerStart ? 0 : Math.floor(Math.random() * 50) + type.nutrient,
-                filter: FILTERS.NONE,
-                x: x,
-                y: y
+                filter: FILTERS.NONE
             };
         }
     }
@@ -65,6 +68,7 @@ let game = {
   round: 1,
   digsLeft: 10,
   interferencePoints: 5,
+  nutrients: 0,
   phase: 'dig',
   playerX: 10,
   playerY: 0,
@@ -74,16 +78,53 @@ let game = {
   grid: [],
   heroes: [],
   particles: [],
-  message: '魔王よ、地面を掘り、魔物の揺りかごを作れ (十字キーで移動、隣接マスを採掘)',
+  eventLog: [],
+  message: '魔王よ、地面を掘り、魔物の揺りかごを作れ (WASDキーで移動、隣接マスを採掘)',
 
+  // 入力制御システム
+  inputQueue: [],
+  isProcessingInput: false,
+  lastInputTime: 0,
+  inputCooldown: 150, // ミリ秒単位の入力間隔制限
+
+  /**
+   * キー入力のバッファリング
+   */
+  enqueueInput(key) {
+    if (this.inputQueue.length < 5) {
+      this.inputQueue.push(key);
+    }
+  },
+
+  /**
+   * 掘削履歴を記録し、メッセージを更新する
+   */
+  log(message) {
+    const timestamp = new Date().toLocaleTimeString('ja-JP', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    this.eventLog.unshift(`[${timestamp}] ${message}`);
+    if (this.eventLog.length > 50) this.eventLog.pop();
+    this.message = message;
+  },
+
+  /**
+   * 掘削可能判定
+   */
   canDig(x, y) {
     const dx = Math.abs(x - this.playerX);
     const dy = Math.abs(y - this.playerY);
-    // 隣接マスの定義（斜めを除く上下左右）
     return (dx + dy === 1) && 
            (x >= 0 && x < this.map.length) && 
            (y >= 0 && y < this.map[0].length) &&
            (this.map[x][y].type === 'wall');
+  },
+
+  /**
+   * 移動可能判定
+   */
+  canMove(x, y) {
+    return (x >= 0 && x < this.map.length) && 
+           (y >= 0 && y < this.map[0].length) &&
+           (this.map[x][y].type === 'empty');
   }
 };
 
@@ -91,16 +132,16 @@ function getAttractiveness(x, y) {
   const cell = game.map[x][y];
   if (!cell || !cell.filter) return 1.0;
   const f = cell.filter;
-  if (f === FILTERS.NURSERY) return 3.0;
-  if (f === FILTERS.SANCTUARY) return 2.0;
-  if (f === FILTERS.RESOURCE) return 2.5;
+  if (f === 'NURSERY') return 3.0;
+  if (f === 'SANCTUARY') return 2.0;
+  if (f === 'RESOURCE') return 2.5;
   return 1.0;
 }
 
 function addParticle(x, y, color, life = 1.0) {
   game.particles.push({
-    x: x * TILE + TILE / 2,
-    y: y * TILE + TILE / 2,
+    x: x * 32 + 16,
+    y: y * 32 + 16,
     vx: (Math.random() - 0.5) * 50,
     vy: (Math.random() - 0.5) * 50,
     life: life,
@@ -120,56 +161,60 @@ function createMonster(x, y, type, parentGenes = null, generation = 1, parentId 
     speed: mutate(parentGenes.speed, nutrient),
     metabolism: mutate(parentGenes.metabolism, nutrient),
     reproThreshold: mutate(parentGenes.reproThreshold, nutrient),
-    size: mutate(parentGenes.size || 1.0, nutrient),
+    size: mutate(parentGenes.size, nutrient),
     appearance: {
       shapeType: parentGenes.appearance.shapeType,
       colorBase: Math.max(0, Math.min(360, parentGenes.appearance.colorBase + (Math.random() * 40 - 20)))
     }
   } : {
-    speed: 0.5 + Math.random() * 0.5,
-    metabolism: 0.8 + Math.random() * 0.4,
-    reproThreshold: 80 + Math.random() * 40,
-    size: 0.8 + Math.random() * 0.4,
+    speed: 0.5 + (nutrient * 0.2),
+    metabolism: 0.5 + (nutrient * 0.2),
+    reproThreshold: 80 + (nutrient * 20),
+    size: 0.5 + (nutrient * 0.5),
     appearance: {
-      shapeType: Math.floor(Math.random() * 3),
-      colorBase: type === 1 ? Math.random() * 60 : 180 + Math.random() * 120
+      shapeType: type === 1 ? Math.floor(Math.random() * 2) + 2 : Math.floor(Math.random() * 2),
+      colorBase: type === 1 ? 0 + Math.random() * 40 : 180 + Math.random() * 60
     }
   };
 
-  return { 
-    id: ++monsterCounter, 
-    parentId, 
-    generation, 
-    x, y, 
-    hp: 10 + (genes.size * 5), 
-    type, 
-    energy: 50, 
-    lastMoveTime: 0, 
-    genes, 
-    isSettled: false,
-    alpha: 0.8 + (genes.size * 0.2)
+  const monster = {
+    id: ++monsterCounter,
+    parentId,
+    generation,
+    x, y,
+    type,
+    hp: 20 * genes.size,
+    energy: 50 * genes.size,
+    genes,
+    lastMoveTime: 0,
+    isSettled: false
   };
+
+  game.monsters.push(monster);
+  return monster;
 }
 
 function checkPredation(cellMonsters) {
   const predators = cellMonsters.filter(m => m.type === 1);
   const preys = cellMonsters.filter(m => m.type === 0);
 
+  if (predators.length === 0 || preys.length === 0) return;
+
   predators.forEach(predator => {
-    if (preys.length > 0 && predator.energy < 100) {
-      const target = preys[Math.floor(Math.random() * preys.length)];
-      target.hp -= 20 * predator.genes.size;
-      predator.energy += 30;
-      if (target.hp <= 0) {
-        game.monsters = game.monsters.filter(m => m.id !== target.id);
-      }
+    const target = preys[Math.floor(Math.random() * preys.length)];
+    const damage = 5 * predator.genes.size;
+    target.hp -= damage;
+    predator.energy += damage * 0.5;
+
+    if (target.hp <= 0) {
+      game.monsters = game.monsters.filter(m => m.id !== target.id);
     }
   });
 }
 
 function updateGrid() {
   game.grid = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => []));
-  
+
   game.monsters.forEach(m => {
     const gx = Math.floor(m.x);
     const gy = Math.floor(m.y);
@@ -190,14 +235,14 @@ function updateGrid() {
 function resize() {
   const pixelRatio = window.devicePixelRatio || 1;
   const availW = window.innerWidth;
-  const availH = window.innerHeight - HUD;
+  const availH = window.innerHeight - 60;
   TILE = Math.floor(Math.min(availW / COLS, availH / ROWS));
-  
+
   canvas.width = COLS * TILE * pixelRatio;
-  canvas.height = (ROWS * TILE + HUD) * pixelRatio;
+  canvas.height = (ROWS * TILE) * pixelRatio;
   canvas.style.width = (COLS * TILE) + "px";
-  canvas.style.height = (ROWS * TILE + HUD) + "px";
-  
+  canvas.style.height = (ROWS * TILE) + "px";
+
   const ctx = canvas.getContext('2d');
   ctx.scale(pixelRatio, pixelRatio);
 }
@@ -206,6 +251,7 @@ function resize() {
 // ===SECTION:INIT_INPUT===
 let playerX = Math.floor(COLS / 2);
 let playerY = 0;
+game.inputQueue = [];
 
 function init() {
   resize();
@@ -216,9 +262,12 @@ function init() {
   game.phase = 'dig';
   game.digsLeft = 10 + (game.round - 1) * 2;
   game.interferencePoints = 5 + game.round;
+  
   playerX = Math.floor(COLS / 2);
   playerY = 0;
-  game.message = `ラウンド ${game.round}：WASD/矢印キーで移動・掘削。残り:${game.digsLeft}`;
+  game.map[playerX][playerY].type = 'ground';
+  
+  game.message = `ラウンド ${game.round}：WASDで移動・隣接壁へ移動で掘削開始。残り回数:${game.digsLeft}`;
   updateGrid();
 }
 
@@ -229,12 +278,10 @@ function dig(x, y) {
   game.map[x][y].type = 'ground';
   game.digsLeft--;
 
-  // 魔物自動生成
   const monsterTypes = ['slime', 'bat', 'skeleton'];
   const type = monsterTypes[Math.floor(Math.random() * monsterTypes.length)];
   game.monsters.push(createMonster(x, y, type));
 
-  // 掘削完了判定
   if (game.digsLeft <= 0) {
     game.phase = 'battle';
     game.message = '掘削終了。勇者の侵攻が始まった！';
@@ -248,39 +295,48 @@ function dig(x, y) {
   return true;
 }
 
-window.addEventListener('keydown', (e) => {
-  if (game.phase === 'over') { game.round = 1; init(); return; }
-  if (game.phase !== 'dig') return;
-
+function handleInput(key) {
   const moves = {
-    'ArrowUp': [0, -1], 'w': [0, -1],
-    'ArrowDown': [0, 1], 's': [0, 1],
-    'ArrowLeft': [-1, 0], 'a': [-1, 0],
-    'ArrowRight': [1, 0], 'd': [1, 0]
+    'w': [0, -1], 's': [0, 1], 'a': [-1, 0], 'd': [1, 0],
+    'ArrowUp': [0, -1], 'ArrowDown': [0, 1], 'ArrowLeft': [-1, 0], 'ArrowRight': [1, 0]
   };
 
-  if (!moves[e.key]) return;
-
-  const [dx, dy] = moves[e.key];
+  if (!moves[key]) return;
+  const [dx, dy] = moves[key];
   const nx = playerX + dx;
   const ny = playerY + dy;
 
   if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
     if (game.map[nx][ny].type === 'wall') {
-      dig(nx, ny);
+      if (dig(nx, ny)) {
+        playerX = nx;
+        playerY = ny;
+      }
     } else {
       playerX = nx;
       playerY = ny;
     }
   }
   updateGrid();
+}
+
+window.addEventListener('keydown', (e) => {
+  if (game.phase === 'over') { game.round = 1; init(); return; }
+  if (game.phase !== 'dig') return;
+
+  game.inputQueue.push(e.key);
+  while (game.inputQueue.length > 0) {
+    handleInput(game.inputQueue.shift());
+  }
 });
 
 function onFilter(e) {
   e.preventDefault();
+  if (game.phase !== 'dig') return;
   const rect = canvas.getBoundingClientRect();
   const cx = Math.floor((e.clientX - rect.left) / TILE);
   const cy = Math.floor((e.clientY - rect.top) / TILE);
+  
   if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS || game.map[cx][cy].type !== 'ground' || game.interferencePoints <= 0) return;
 
   const filters = [null, 'nursery', 'sanctuary', 'resource'];
@@ -293,20 +349,23 @@ function onFilter(e) {
 
 // ===SECTION:UPDATE===
 function dig(x, y) {
-  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[y][x].value === 0 || game.digsLeft <= 0) return;
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || game.map[y][x].value === 0 || game.digsLeft <= 0) return false;
 
   game.map[y][x].value = 0;
   game.digsLeft--;
 
   const nutrient = game.map[y][x].nutrient;
-  if (Math.random() < nutrient * 0.2) {
-    const type = Math.random() < 0.3 ? 1 : 0; // 0:草食, 1:肉食
-    game.monsters.push(createMonster(x, y, type, {
-      speed: 0.2 + Math.random() * 0.5,
-      size: 0.1 + Math.random() * 0.4,
-      reproThreshold: 50 + Math.random() * 50
-    }, 0, Date.now() + Math.random()));
+  if (Math.random() < nutrient * 0.4) {
+    const type = Math.random() < 0.4 ? 1 : 0;
+    const genes = {
+      speed: 0.3 + Math.random() * 0.4,
+      size: 0.2 + Math.random() * 0.3,
+      reproThreshold: 40 + Math.random() * 60
+    };
+    game.monsters.push(createMonster(x, y, type, genes, 0, 50 + Math.random() * 50));
+    addParticle(x, y, '#ffffff');
   }
+  return true;
 }
 
 function update(dt) {
@@ -315,43 +374,66 @@ function update(dt) {
     if (p.life <= 0) game.particles.splice(i, 1);
   });
 
+  if (game.phase === 'dig') {
+    const moveSpeed = 4.0;
+    let nextX = game.player.x;
+    let nextY = game.player.y;
+
+    if (keys['w']) nextY -= moveSpeed * dt;
+    if (keys['s']) nextY += moveSpeed * dt;
+    if (keys['a']) nextX -= moveSpeed * dt;
+    if (keys['d']) nextX += moveSpeed * dt;
+
+    nextX = Math.max(0, Math.min(COLS - 1, nextX));
+    nextY = Math.max(0, Math.min(ROWS - 1, nextY));
+
+    if (game.map[Math.floor(nextY)][Math.floor(nextX)].value === 0) {
+      game.player.x = nextX;
+      game.player.y = nextY;
+    }
+
+    if (keys[' ']) {
+      const dx = [0, 0, 1, -1];
+      const dy = [1, -1, 0, 0];
+      for(let i=0; i<4; i++){
+        dig(Math.floor(game.player.x) + dx[i], Math.floor(game.player.y) + dy[i]);
+      }
+    }
+    
+    if (game.digsLeft <= 0 && game.monsters.length > 0) game.phase = 'battle';
+  }
+
   if (game.phase === 'battle') {
     updateGrid();
 
     for (let i = game.monsters.length - 1; i >= 0; i--) {
       let m = game.monsters[i];
-      m.energy -= (m.genes.speed * 0.5 + m.genes.size * 0.2) * dt;
+      m.energy -= (m.genes.speed * 0.3 + m.genes.size * 0.1) * dt * 10;
 
       if (m.type === 1) {
-        let targets = game.grid[m.y][m.x].filter(o => o.type === 0);
+        let targets = game.grid[m.y] && game.grid[m.y][m.x] ? game.grid[m.y][m.x].filter(o => o.type === 0 && o !== m) : [];
         if (targets.length > 0) {
-          m.energy += targets[0].energy * 0.5;
+          m.energy += targets[0].energy * 0.8;
           targets[0].energy = -1;
           addParticle(m.x, m.y, '#ff0000');
         }
       }
 
       m.lastMoveTime += dt;
-      if (m.lastMoveTime > (1.1 - m.genes.speed)) {
-        let neighbors = [];
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            let ny = m.y + dy, nx = m.x + dx;
-            if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && game.map[ny][nx].value === 0) {
-              neighbors.push({x: nx, y: ny});
-            }
-          }
-        }
-        if (neighbors.length > 0) {
-          let next = neighbors[Math.floor(Math.random() * neighbors.length)];
-          m.x = next.x; m.y = next.y;
+      if (m.lastMoveTime > (1.5 - m.genes.speed)) {
+        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+        const [dx, dy] = dirs[Math.floor(Math.random() * 4)];
+        const nx = Math.max(0, Math.min(COLS - 1, Math.floor(m.x) + dx));
+        const ny = Math.max(0, Math.min(ROWS - 1, Math.floor(m.y) + dy));
+        if (game.map[ny][nx].value === 0) {
+          m.x = nx; m.y = ny;
         }
         m.lastMoveTime = 0;
       }
 
       if (m.energy > m.genes.reproThreshold) {
         m.energy /= 2;
-        game.monsters.push(createMonster(m.x, m.y, m.type, {...m.genes}, m.generation + 1, m.id));
+        game.monsters.push(createMonster(m.x, m.y, m.type, {...m.genes}, m.generation + 1, m.energy));
         addParticle(m.x, m.y, '#ffff00');
       }
 
@@ -365,26 +447,24 @@ function update(dt) {
         let best = {x: h.x, y: h.y, score: -1};
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
-            let ny = h.y + dy, nx = h.x + dx;
-            if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) {
-              let score = (game.grid[ny][nx] ? game.grid[ny][nx].length : 0) * 10 + Math.random();
-              if (score > best.score) best = {x: nx, y: ny, score: score};
-            }
+            let ny = Math.max(0, Math.min(ROWS-1, h.y + dy)), nx = Math.max(0, Math.min(COLS-1, h.x + dx));
+            let score = (game.grid[ny][nx] ? game.grid[ny][nx].length : 0) * 20 + Math.random() * 5;
+            if (score > best.score) best = {x: nx, y: ny, score: score};
           }
         }
         h.x = best.x; h.y = best.y;
-        if (game.grid[h.y][h.x].length > 0) game.grid[h.y][h.x][0].energy -= h.atk;
+        if (game.grid[h.y][h.x]) game.grid[h.y][h.x].forEach(m => m.energy -= h.atk);
       }
       if (h.hp <= 0) game.heroes.splice(idx, 1);
     });
 
-    if (game.monsters.length === 0) {
+    if (game.monsters.length === 0 && game.heroes.length > 0) {
       game.phase = 'over';
-      game.message = 'ダンジョン崩壊...';
+      game.message = 'ダンジョン生態系が崩壊しました';
     } else if (game.heroes.length === 0) {
       game.round++;
       game.phase = 'dig';
-      game.digsLeft = 10 + (game.round * 2);
+      game.digsLeft = 15 + (game.round * 5);
     }
   }
 }
@@ -392,106 +472,102 @@ function update(dt) {
 
 // ===SECTION:RENDER===
 function render() {
-  ctx.fillStyle = '#0a0a0a';
+  const HUD_HEIGHT = 120;
+  const mapAreaHeight = canvas.height - HUD_HEIGHT;
+
+  // 背景クリア
+  ctx.fillStyle = '#050505';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const VISIBILITY_RADIUS = 5;
-  const HUD_HEIGHT = 120;
-  const mapHeight = canvas.height - HUD_HEIGHT;
-
-  function isVisible(x, y) {
+  // 視界判定関数
+  const isVisible = (x, y) => {
     const dx = x - game.playerX;
     const dy = y - game.playerY;
-    return Math.sqrt(dx * dx + dy * dy) <= VISIBILITY_RADIUS;
-  }
+    return Math.sqrt(dx * dx + dy * dy) <= 6; // VISIBILITY_RADIUS
+  };
 
-  // 地形描画
+  // 1. 地形描画ループ
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
+      const tile = game.map[x][y];
       const visible = isVisible(x, y);
-      const d = Math.min(1, game.map[x][y].value / 3);
-      ctx.fillStyle = visible ? `rgb(${d * 30}, ${d * 120 + 20}, ${d * 60})` : '#050505';
-      ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
+      
+      // 地形色：WALL(グレー系) vs GROUND(黒～栄養値に応じた赤黒い土)
+      const brightness = tile.value > 0 ? (tile.value * 20) : 0;
+      const baseColor = tile.value > 0 ? `rgb(${30 + brightness}, ${20 + brightness / 2}, ${20 + brightness / 2})` : '#0a0a0a';
+      
+      ctx.fillStyle = visible ? baseColor : '#000000';
+      ctx.fillRect(x * TILE, y * TILE, TILE - 1, TILE - 1);
 
-      // 掘削可能マスのハイライト
+      // 掘削ガイド（隣接マス）
       const dx = Math.abs(x - game.playerX);
       const dy = Math.abs(y - game.playerY);
-      if (game.digsLeft > 0 && ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) && game.map[x][y].value > 0) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      if (visible && game.digsLeft > 0 && ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) && tile.value > 0) {
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
         ctx.lineWidth = 2;
-        ctx.strokeRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4);
-      }
-
-      if (visible && game.map[x][y].filter) {
-        ctx.fillStyle = game.map[x][y].filter === FILTERS.NURSERY ? 'rgba(100,255,100,0.3)' : 'rgba(255,255,100,0.3)';
-        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        ctx.strokeRect(x * TILE + 4, y * TILE + 4, TILE - 8, TILE - 8);
       }
     }
   }
 
-  // 魔物描画
+  // 2. 魔王強調エフェクト（パルス）
+  const px = game.playerX * TILE + TILE / 2;
+  const py = game.playerY * TILE + TILE / 2;
+  const pulse = Math.sin(Date.now() / 300) * 5 + 10;
+  const grad = ctx.createRadialGradient(px, py, 0, px, py, TILE * 2);
+  grad.addColorStop(0, 'rgba(100, 200, 255, 0.3)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(px, py, TILE * 2 + pulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. 魔物描画
   game.monsters.forEach(m => {
     if (!isVisible(m.x, m.y)) return;
-    const px = m.x * TILE + TILE / 2;
-    const py = m.y * TILE + TILE / 2;
-    const size = (TILE / 2.5) * (m.genes.size || 1);
-    ctx.fillStyle = `hsl(${m.appearance.colorBase}, 70%, 50%)`;
+    const mx = m.x * TILE + TILE / 2;
+    const my = m.y * TILE + TILE / 2;
+    ctx.fillStyle = `hsl(${m.appearance.colorBase}, 80%, 60%)`;
     ctx.beginPath();
     if (m.appearance.shapeType === 0) {
-      ctx.arc(px, py, size, 0, Math.PI * 2);
-    } else if (m.appearance.shapeType === 1) {
-      for (let i = 0; i < 4; i++) {
-        const angle = (i * Math.PI / 2) + Math.PI / 4;
-        const x = px + Math.cos(angle) * size * 1.2;
-        const y = py + Math.sin(angle) * size * 1.2;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
+      ctx.arc(mx, my, TILE / 3, 0, Math.PI * 2);
     } else {
-      for (let i = 0; i < 10; i++) {
-        const r = i % 2 === 0 ? size : size / 1.5;
-        const angle = (i * Math.PI / 5) - Math.PI / 2;
-        ctx.lineTo(px + Math.cos(angle) * r, py + Math.sin(angle) * r);
-      }
+      ctx.rect(mx - TILE / 3, my - TILE / 3, TILE / 1.5, TILE / 1.5);
     }
-    ctx.closePath();
     ctx.fill();
   });
 
-  // 勇者描画
+  // 4. 勇者描画
   game.heroes.forEach(h => {
     if (!isVisible(h.x, h.y)) return;
-    ctx.fillStyle = '#ff4444';
-    ctx.shadowBlur = 15;
+    ctx.fillStyle = '#ff3333';
+    ctx.shadowBlur = 10;
     ctx.shadowColor = '#ff0000';
-    ctx.fillRect(h.x * TILE + 4, h.y * TILE + 4, TILE - 8, TILE - 8);
+    ctx.fillRect(h.x * TILE + 5, h.y * TILE + 5, TILE - 10, TILE - 10);
     ctx.shadowBlur = 0;
   });
 
-  // フォグ描画
+  // 5. フォグ描画
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
-      if (!isVisible(x, y)) {
-        ctx.fillStyle = 'rgba(0,0,0,0.9)';
-        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-      }
+      if (!isVisible(x, y)) ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
     }
   }
 
-  // HUD描画
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, mapHeight, canvas.width, HUD_HEIGHT);
+  // 6. HUD描画（UI）
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, mapAreaHeight, canvas.width, HUD_HEIGHT);
   ctx.strokeStyle = '#333';
-  ctx.strokeRect(0, mapHeight, canvas.width, HUD_HEIGHT);
+  ctx.strokeRect(0, mapAreaHeight, canvas.width, HUD_HEIGHT);
 
-  ctx.fillStyle = '#00ffcc';
-  ctx.font = 'bold 18px "Courier New"';
-  ctx.fillText(`ROUND: ${game.round}`, 30, mapHeight + 40);
-  ctx.fillText(`DIGS LEFT: ${game.digsLeft}`, 200, mapHeight + 40);
-  ctx.fillText(`INTERFERENCE: ${game.interferencePoints}`, 400, mapHeight + 40);
-
-  ctx.fillStyle = '#cccccc';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 20px "Courier New"';
+  ctx.fillText(`ROUND: ${game.round}`, 20, mapAreaHeight + 40);
+  ctx.fillText(`DIGS LEFT: ${game.digsLeft}`, 200, mapAreaHeight + 40);
+  ctx.fillStyle = '#aaa';
   ctx.font = '14px monospace';
-  ctx.fillText(`MESSAGE: ${game.message}`, 30, mapHeight + 80);
+  ctx.fillText(`SYSTEM MESSAGE: ${game.message}`, 20, mapAreaHeight + 80);
 }
 // ===END:RENDER===
 
