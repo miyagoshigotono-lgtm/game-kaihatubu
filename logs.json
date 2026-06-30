@@ -8,5 +8,15 @@
     "task": "window.addEventListener('keydown', (e) => { if (game.phase === 'dig' && game.digsLeft > 0) { const dx = (e.key === 'a' ? -1 : e.key === 'd' ? 1 : 0); const dy = (e.key === 'w' ? -1 : e.key === 's' ? 1…",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-30 21:23",
+    "cycle_type": "meeting",
+    "cycle_number": 2,
+    "result": "success",
+    "target_section": "UPDATE",
+    "task": "update(dt)関数内に、魔物の生死判定と勇者の侵攻AIを実装する。具体的には、m.hpが0以下になった魔物を配列から削除し、勇者が最も近い地面マスを目指して最短距離（マンハッタン距離）で移動し、隣接する魔物にダメージを与えるロジックを組み込む。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

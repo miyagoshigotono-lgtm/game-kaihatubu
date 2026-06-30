@@ -262,19 +262,63 @@ window.addEventListener('keydown', (e) => {
 // ===END:INIT_INPUT===
 
 // ===SECTION:UPDATE===
-// 毎フレームの状態更新。パーティクル・生態系・勇者・勝敗判定。
 function update(dt) {
+  // パーティクル更新
   for (let i = game.particles.length - 1; i >= 0; i--) {
     const p = game.particles[i];
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.5;
     if (p.life <= 0) game.particles.splice(i, 1);
   }
 
+  // 魔物の生死判定と更新
+  for (let i = game.monsters.length - 1; i >= 0; i--) {
+    const m = game.monsters[i];
+    if (m.hp <= 0) {
+      game.monsters.splice(i, 1);
+      continue;
+    }
+  }
+
+  // フェイズごとのロジック
   if (game.phase === 'dig') {
-    updateEcosystem(dt);   // 採掘中も魔物は少しずつ生きる
+    updateEcosystem(dt);
   } else if (game.phase === 'battle') {
     updateEcosystem(dt);
-    updateHeroes(dt);
+
+    // 勇者AI：最短距離での移動と攻撃
+    for (let h of game.heroes) {
+      let targetMonster = null;
+      let minDistance = Infinity;
+
+      // 最も近い魔物を探索
+      for (let m of game.monsters) {
+        const dist = Math.abs(h.x - m.x) + Math.abs(h.y - m.y);
+        if (dist < minDistance) {
+          minDistance = dist;
+          targetMonster = m;
+        }
+      }
+
+      if (targetMonster) {
+        if (minDistance <= 1) {
+          // 隣接時は攻撃
+          targetMonster.hp -= h.atk * dt;
+        } else {
+          // マンハッタン距離で接近
+          if (h.x < targetMonster.x) h.x += h.speed * dt;
+          else if (h.x > targetMonster.x) h.x -= h.speed * dt;
+          else if (h.y < targetMonster.y) h.y += h.speed * dt;
+          else if (h.y > targetMonster.y) h.y -= h.speed * dt;
+        }
+      }
+    }
+
+    // 勇者の生死判定
+    for (let i = game.heroes.length - 1; i >= 0; i--) {
+      if (game.heroes[i].hp <= 0) game.heroes.splice(i, 1);
+    }
+
+    // 勝敗判定
     if (game.heroes.length === 0) {
       game.phase = 'win';
       game.round++;

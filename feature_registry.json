@@ -10,10 +10,12 @@
     "RENDER": "render()。地形・魔物・勇者・魔王・パーティクル・HUDの描画。"
   },
   "recent_sections": [
-    "INIT_INPUT"
+    "INIT_INPUT",
+    "UPDATE"
   ],
   "implemented_features": [
-    "[INIT_INPUT] window.addEventListener('keydown', (e) => { if (game.phase === 'dig' && game.dig…"
+    "[INIT_INPUT] window.addEventListener('keydown', (e) => { if (game.phase === 'dig' && game.dig…",
+    "[UPDATE] update(dt)関数内に、魔物の生死判定と勇者の侵攻AIを実装する。具体的には、m.hpが0以下になった魔物を配列から削除し、勇者が最も近い地面マスを目指し…"
   ],
   "failed_approaches": [],
   "current_cycle": 0
