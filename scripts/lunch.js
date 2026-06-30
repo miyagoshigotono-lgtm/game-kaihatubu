@@ -8,7 +8,9 @@
  */
 const fs = require('fs');
 const https = require('https');
+const { verifyGameHtml } = require('./verify-game.js');
 
+const LAST_GOOD = 'game.last-good.html';
 const MODEL = 'gemini-3.1-flash-lite';
 const API_KEY = process.env.GEMINI_API_KEY || '';
 const MAX_RETRY = 2;
@@ -328,6 +330,10 @@ ${rejectReason ? `【前回の却下理由（必ず修正すること）】\n${r
   const fullCheck = verifyFullHtml(newHtml);
   if (!fullCheck.ok) return { pass: false, html: gameHtml, reason: '[全文検証NG]\n' + fullCheck.blocking.join('\n') };
 
+  // 実行ゲート：実際に起動して落ちないかを検証（横断的な不整合をここで弾く）
+  const runCheck = verifyGameHtml(newHtml);
+  if (!runCheck.ok) return { pass: false, html: gameHtml, reason: '[実行ゲートNG] 起動/実行時にエラー:\n' + runCheck.errors.join('\n') };
+
   const qaPrompt = `
 あなたは品質・QAエージェントです。game.html の ${targetSection} セクションを書き換えた「新しいコード」を審査します。
 （ファイル全体の構造・括弧の対応・セクションマーカーの保全は、別途プログラムが静的検証で確認済みです。あなたはこのセクションの内容のみを判定してください。全文を渡されているわけではありません。）
@@ -359,13 +365,27 @@ ${sectionCode}
 // メイン
 // ============================================================
 async function main() {
-  const gameHtml = readFileSafe('game.html', '');
+  let gameHtml = readFileSafe('game.html', '');
   const registry = readJsonSafe('feature_registry.json', { recent_sections: [], implemented_features: [], failed_approaches: [] });
   const logs = readJsonSafe('logs.json', []);
   const intentData = readJsonSafe('user_intent.json', {});
   const userIntent = String(intentData.intent || '');
 
   if (!Array.isArray(logs)) throw new Error('logs.json が配列ではありません。');
+
+  // 自己修復：現在の game.html が壊れていたら、最後に動いた版へ巻き戻してから開始する
+  const startCheck = verifyGameHtml(gameHtml);
+  if (!startCheck.ok) {
+    const lastGood = readFileSafe(LAST_GOOD, '');
+    if (lastGood && verifyGameHtml(lastGood).ok) {
+      console.log(`[${CYCLE_TYPE}] game.html が壊れています（${truncate(startCheck.errors.join(' / '), 120)}）→ ${LAST_GOOD} へ巻き戻します。`);
+      fs.writeFileSync('game.html', lastGood, 'utf8');
+      gameHtml = lastGood;
+    } else {
+      console.error(`[${CYCLE_TYPE}] game.html が壊れており、巻き戻し先もありません。中止します。`);
+      process.exit(1);
+    }
+  }
 
   if (!hasSectionMarkers(gameHtml)) {
     console.error(`[${CYCLE_TYPE}] game.html にセクションマーカーがありません。`);
@@ -399,6 +419,7 @@ async function main() {
 
   if (result && result.pass) {
     fs.writeFileSync('game.html', result.html, 'utf8');
+    fs.writeFileSync(LAST_GOOD, result.html, 'utf8');   // 動作確認済みをチェックポイント保存
 
     const newFeature = `[${targetSection}] ${truncate(specificTask, 80)}`;
     if (!implementedFeatures.some(f => f.startsWith(`[${targetSection}]`) && f.includes(truncate(specificTask, 30)))) {

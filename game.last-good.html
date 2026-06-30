@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>破壊神のダンジョンメイカー</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; font-family: 'Courier New', Courier, monospace; color: #fff; }
+    canvas { display: block; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <script>
+// ===SECTION:CONFIG===
+// 定数・Canvas初期化・グリッド設定・画面リサイズ。ゲーム全体で共有する土台。
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const COLS = 20;       // 横マス数
+const ROWS = 14;       // 縦マス数
+const HUD = 70;        // 画面下部の情報表示エリアの高さ(px)
+let TILE = 32;         // 1マスのピクセルサイズ（resizeで決定）
+let monsterId = 0;     // 魔物の通し番号
+
+const COLORS = {
+  ground:   '#15101f',
+  wall:     '#2a1f3d',
+  wallEdge: '#3c2c57',
+  player:   '#c879ff',
+  prey:     '#5bd6a0',
+  predator: '#ff6b6b',
+  hero:     '#ffd23f',
+  hud:      '#181222'
+};
+
+function resize() {
+  const ratio = window.devicePixelRatio || 1;
+  const availW = Math.min(window.innerWidth, 1200);
+  const availH = window.innerHeight - HUD - 4;
+  TILE = Math.max(12, Math.floor(Math.min(availW / COLS, availH / ROWS)));
+  canvas.width = COLS * TILE * ratio;
+  canvas.height = (ROWS * TILE + HUD) * ratio;
+  canvas.style.width = (COLS * TILE) + 'px';
+  canvas.style.height = (ROWS * TILE + HUD) + 'px';
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+}
+// ===END:CONFIG===
+
+// ===SECTION:STATE===
+// gameオブジェクト（唯一の状態の置き場）とマップ操作の基本ヘルパー。
+const game = {
+  round: 1,
+  phase: 'dig',          // 'dig'（採掘中）| 'battle'（防衛戦）| 'over'（敗北）| 'win'（勝利）
+  digsLeft: 12,
+  player: { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) },
+  map: [],               // map[x][y] = { wall:bool, filter:null }
+  monsters: [],
+  heroes: [],
+  particles: [],
+  message: ''
+};
+
+function inBounds(x, y) {
+  return x >= 0 && x < COLS && y >= 0 && y < ROWS;
+}
+function isGround(x, y) {
+  return inBounds(x, y) && game.map[x] && game.map[x][y] && !game.map[x][y].wall;
+}
+function addParticle(x, y, color) {
+  game.particles.push({
+    x: x * TILE + TILE / 2,
+    y: y * TILE + TILE / 2,
+    vx: (Math.random() - 0.5) * 60,
+    vy: (Math.random() - 0.5) * 60,
+    life: 1,
+    color: color
+  });
+}
+// ===END:STATE===
+
+// ===SECTION:ECOSYSTEM===
+// 魔物の生成・生態系（移動・捕食・繁殖）と、勇者AI。ゲームの「生きている」部分。
+function createMonster(x, y, type) {
+  // type 0 = 草食(被食者) / type 1 = 肉食(捕食者)
+  return { id: ++monsterId, x: x, y: y, type: type, hp: type === 1 ? 14 : 8, energy: 40, cooldown: Math.random() };
+}
+function spawnMonster(x, y) {
+  const type = Math.random() < 0.35 ? 1 : 0;
+  game.monsters.push(createMonster(x, y, type));
+}
+function groundNeighbors(x, y) {
+  const out = [];
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  for (let i = 0; i < dirs.length; i++) {
+    const nx = x + dirs[i][0], ny = y + dirs[i][1];
+    if (isGround(nx, ny)) out.push([nx, ny]);
+  }
+  return out;
+}
+function nearestHero(x, y) {
+  let best = null, bestD = Infinity;
+  for (const h of game.heroes) {
+    const d = Math.abs(h.x - x) + Math.abs(h.y - y);
+    if (d < bestD) { bestD = d; best = h; }
+  }
+  return { hero: best, dist: bestD };
+}
+
+function updateEcosystem(dt) {
+  for (let i = game.monsters.length - 1; i >= 0; i--) {
+    const m = game.monsters[i];
+    m.energy -= dt * (m.type === 1 ? 3 : 2);
+    m.cooldown -= dt;
+
+    if (m.cooldown <= 0) {
+      // 移動
+      const opts = groundNeighbors(m.x, m.y);
+      if (opts.length) { const p = opts[(Math.random() * opts.length) | 0]; m.x = p[0]; m.y = p[1]; }
+      m.cooldown = 0.4 + Math.random() * 0.4;
+
+      // 捕食：同じマスの被食者を食べる
+      if (m.type === 1) {
+        const prey = game.monsters.find(o => o.type === 0 && o.x === m.x && o.y === m.y);
+        if (prey) { prey.hp -= 6; m.energy += 18; addParticle(m.x, m.y, '#ff44ff'); }
+      }
+      // 攻撃：隣接する勇者をかじる
+      const nh = nearestHero(m.x, m.y);
+      if (nh.hero && nh.dist <= 1) { nh.hero.hp -= 4; addParticle(nh.hero.x, nh.hero.y, '#ff6b6b'); }
+
+      // 繁殖
+      if (m.energy > 70) {
+        m.energy -= 40;
+        const opts2 = groundNeighbors(m.x, m.y);
+        const p = opts2.length ? opts2[(Math.random() * opts2.length) | 0] : [m.x, m.y];
+        game.monsters.push(createMonster(p[0], p[1], m.type));
+        addParticle(m.x, m.y, '#00ff88');
+      }
+    }
+
+    if (m.energy <= 0 || m.hp <= 0) game.monsters.splice(i, 1);
+  }
+}
+
+function spawnHeroes(n) {
+  for (let i = 0; i < n; i++) {
+    let y = (Math.random() * ROWS) | 0;
+    // 入口（左端）付近の地面を探す。なければ掘ってでも出現させる。
+    if (game.map[0][y].wall) game.map[0][y].wall = false;
+    game.heroes.push({ x: 0, y: y, hp: 24 + game.round * 6, cooldown: Math.random() });
+  }
+}
+
+function updateHeroes(dt) {
+  for (let i = game.heroes.length - 1; i >= 0; i--) {
+    const h = game.heroes[i];
+    h.cooldown -= dt;
+    if (h.cooldown <= 0) {
+      // 最も近い魔物へ一歩近づく
+      let target = null, bestD = Infinity;
+      for (const m of game.monsters) {
+        const d = Math.abs(m.x - h.x) + Math.abs(m.y - h.y);
+        if (d < bestD) { bestD = d; target = m; }
+      }
+      if (target) {
+        const dx = Math.sign(target.x - h.x), dy = Math.sign(target.y - h.y);
+        if (dx !== 0 && isGround(h.x + dx, h.y)) h.x += dx;
+        else if (dy !== 0 && isGround(h.x, h.y + dy)) h.y += dy;
+        else { const opts = groundNeighbors(h.x, h.y); if (opts.length) { const p = opts[(Math.random() * opts.length) | 0]; h.x = p[0]; h.y = p[1]; } }
+        // 攻撃：隣接する魔物を斬る
+        if (target && Math.abs(target.x - h.x) + Math.abs(target.y - h.y) <= 1) {
+          target.hp -= 8; addParticle(target.x, target.y, '#ffd23f');
+          if (target.hp <= 0) game.monsters = game.monsters.filter(o => o.id !== target.id);
+        }
+      }
+      h.cooldown = 0.5;
+    }
+    if (h.hp <= 0) { addParticle(h.x, h.y, '#ffffff'); game.heroes.splice(i, 1); }
+  }
+}
+// ===END:ECOSYSTEM===
+
+// ===SECTION:INIT_INPUT===
+// ラウンド初期化と、魔王の操作（移動＝隣接壁の採掘）。
+function init() {
+  if (!game.round || game.round < 1) game.round = 1;
+  game.phase = 'dig';
+  game.digsLeft = 10 + (game.round - 1) * 2;
+  game.player = { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) };
+  game.monsters = [];
+  game.heroes = [];
+  game.particles = [];
+
+  game.map = [];
+  for (let x = 0; x < COLS; x++) {
+    game.map[x] = [];
+    for (let y = 0; y < ROWS; y++) game.map[x][y] = { wall: true, filter: null };
+  }
+  game.map[game.player.x][game.player.y].wall = false;
+
+  game.message = 'ラウンド' + game.round + '：WASD/矢印キーで移動。壁に進むと掘れる（残り ' + game.digsLeft + '）';
+}
+
+function startBattle() {
+  game.phase = 'battle';
+  spawnHeroes(2 + game.round);
+  game.message = '勇者が侵攻してきた！魔物たちよ、迎え撃て！';
+}
+
+function tryMove(dx, dy) {
+  if (game.phase === 'over' || game.phase === 'win') { game.round = (game.phase === 'win') ? game.round : 1; init(); return; }
+  const nx = game.player.x + dx, ny = game.player.y + dy;
+  if (!inBounds(nx, ny)) return;
+  const cell = game.map[nx][ny];
+
+  if (cell.wall) {
+    if (game.phase !== 'dig' || game.digsLeft <= 0) return;
+    cell.wall = false;
+    game.digsLeft--;
+    addParticle(nx, ny, '#c879ff');
+    if (Math.random() < 0.7) spawnMonster(nx, ny);   // 掘った土から魔物が生まれる
+    game.player.x = nx; game.player.y = ny;
+    if (game.digsLeft <= 0) startBattle();
+    else game.message = '採掘中… 残り ' + game.digsLeft;
+  } else {
+    game.player.x = nx; game.player.y = ny;
+  }
+}
+
+function onKey(e) {
+  const k = (e.key || '').toLowerCase();
+  const moves = {
+    'arrowup': [0, -1], 'w': [0, -1],
+    'arrowdown': [0, 1], 's': [0, 1],
+    'arrowleft': [-1, 0], 'a': [-1, 0],
+    'arrowright': [1, 0], 'd': [1, 0]
+  };
+  if (moves[k]) { e.preventDefault(); tryMove(moves[k][0], moves[k][1]); }
+}
+window.addEventListener('keydown', onKey);
+// ===END:INIT_INPUT===
+
+// ===SECTION:UPDATE===
+// 毎フレームの状態更新。パーティクル・生態系・勇者・勝敗判定。
+function update(dt) {
+  for (let i = game.particles.length - 1; i >= 0; i--) {
+    const p = game.particles[i];
+    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.5;
+    if (p.life <= 0) game.particles.splice(i, 1);
+  }
+
+  if (game.phase === 'dig') {
+    updateEcosystem(dt);   // 採掘中も魔物は少しずつ生きる
+  } else if (game.phase === 'battle') {
+    updateEcosystem(dt);
+    updateHeroes(dt);
+    if (game.heroes.length === 0) {
+      game.phase = 'win';
+      game.round++;
+      game.message = '防衛成功！ ラウンド' + game.round + 'へ（WASDで再開）';
+    } else if (game.monsters.length === 0) {
+      game.phase = 'over';
+      game.message = '魔物が全滅した… 敗北（WASDで再挑戦）';
+    }
+  }
+}
+// ===END:UPDATE===
+
+// ===SECTION:RENDER===
+// Canvas描画。地形・魔物・勇者・魔王・パーティクル・HUD。
+function render() {
+  const W = COLS * TILE, H = ROWS * TILE;
+  ctx.clearRect(0, 0, W, H + HUD);
+
+  // 地形
+  for (let x = 0; x < COLS; x++) {
+    for (let y = 0; y < ROWS; y++) {
+      const c = game.map[x] && game.map[x][y];
+      if (!c) continue;
+      ctx.fillStyle = c.wall ? COLORS.wall : COLORS.ground;
+      ctx.fillRect(x * TILE, y * TILE, TILE - 1, TILE - 1);
+      if (c.wall) { ctx.fillStyle = COLORS.wallEdge; ctx.fillRect(x * TILE, y * TILE, TILE - 1, 3); }
+    }
+  }
+
+  // 魔物
+  for (const m of game.monsters) {
+    ctx.fillStyle = m.type === 1 ? COLORS.predator : COLORS.prey;
+    ctx.beginPath();
+    ctx.arc(m.x * TILE + TILE / 2, m.y * TILE + TILE / 2, TILE * 0.30, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 勇者
+  for (const h of game.heroes) {
+    ctx.fillStyle = COLORS.hero;
+    ctx.fillRect(h.x * TILE + TILE * 0.25, h.y * TILE + TILE * 0.18, TILE * 0.5, TILE * 0.64);
+  }
+
+  // 魔王（プレイヤー）：ひし形
+  const px = game.player.x * TILE, py = game.player.y * TILE;
+  ctx.fillStyle = COLORS.player;
+  ctx.beginPath();
+  ctx.moveTo(px + TILE / 2, py + TILE * 0.10);
+  ctx.lineTo(px + TILE * 0.88, py + TILE / 2);
+  ctx.lineTo(px + TILE / 2, py + TILE * 0.90);
+  ctx.lineTo(px + TILE * 0.12, py + TILE / 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // パーティクル
+  for (const p of game.particles) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+
+  // HUD
+  ctx.fillStyle = COLORS.hud;
+  ctx.fillRect(0, H, W, HUD);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 14px "Courier New", monospace';
+  ctx.fillText('R' + game.round + '  掘削:' + game.digsLeft + '  魔物:' + game.monsters.length + '  勇者:' + game.heroes.length, 12, H + 26);
+  ctx.fillStyle = '#c9b8e8';
+  ctx.font = '12px "Courier New", monospace';
+  ctx.fillText(game.message || '', 12, H + 50);
+}
+// ===END:RENDER===
+
+    // --- 起動コード（セクション外・防御的に呼び出す） ---
+    window.addEventListener('resize', function () { if (typeof resize === 'function') resize(); });
+    if (typeof resize === 'function') resize();
+    if (typeof init === 'function') init();
+    let __lastTs = 0;
+    function __loop(ts) {
+      const dt = Math.min(0.05, ((ts - __lastTs) || 16) / 1000);
+      __lastTs = ts;
+      if (typeof update === 'function') update(dt);
+      if (typeof render === 'function') render();
+      requestAnimationFrame(__loop);
+    }
+    requestAnimationFrame(__loop);
+  </script>
+</body>
+</html>
