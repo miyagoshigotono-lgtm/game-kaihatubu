@@ -228,9 +228,7 @@ function init() {
   );
   game.map[game.player.x][game.player.y].wall = false;
 
-  if (typeof updateUI === 'function') {
-    updateUI();
-  }
+  if (typeof updateUI === 'function') updateUI();
 }
 
 function spawnMonster(x, y) {
@@ -264,7 +262,7 @@ function onDig(nx, ny) {
     
     if (game.digsLeft <= 0) {
       startBattle();
-    } else {
+    } else if (typeof updateUI === 'function') {
       updateUI();
     }
   }
@@ -285,25 +283,13 @@ window.addEventListener('keydown', (e) => {
 
     if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
       if (game.map[nx][ny].wall) {
-        if (e.key === ' ' || e.key === 'Enter') {
-            onDig(nx, ny);
-        }
+        onDig(nx, ny);
       } else {
         game.player.x = nx;
         game.player.y = ny;
-        updateUI();
+        if (typeof updateUI === 'function') updateUI();
       }
     }
-  } else if (e.key === ' ' || e.key === 'Enter') {
-      const neighbors = [[0, -1], [0, 1], [-1, 0], [1, 0]];
-      for (const [dx, dy] of neighbors) {
-          const nx = game.player.x + dx;
-          const ny = game.player.y + dy;
-          if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny].wall) {
-              onDig(nx, ny);
-              break;
-          }
-      }
   }
 });
 // ===END:INIT_INPUT===

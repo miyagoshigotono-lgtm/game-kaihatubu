@@ -78,5 +78,15 @@
     "task": "update(dt)関数内に、WASDキー入力と連動した魔王の移動処理（isGround判定による衝突検知）と、掘削回数（digsLeft）を消費して壁（wall: true）を地面（wall: false）に書き換えるdigTile(x, y)関数を実装する。",
     "qa_note": "[実行ゲートNG] 起動/実行時にエラー:\nループ実行エラー: Cannot read properties of undefined (reading 'x')",
     "retry_count": 2
+  },
+  {
+    "timestamp": "2026-07-01 05:31",
+    "cycle_type": "meeting",
+    "cycle_number": 9,
+    "result": "success",
+    "target_section": "INIT_INPUT",
+    "task": "キーボードイベントリスナーを修正し、WASDキーによる魔王の移動を『隣接する地面マスへの移動』に制限する。また、移動先が『壁（wall: true）』であった場合、掘削回数（digsLeft）を消費して壁を破壊し、その座標を地面に変更した上でspawnMonster()を呼び出すロジックを実装する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]
