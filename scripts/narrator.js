@@ -59,7 +59,7 @@ function buildFacts(cycle) {
   const task = truncate(cycle.task || cycle.priority || '', 80) || 'こまかな調整';
   return {
     date: cycle.timestamp || nowStampJst(),
-    cycle_type: cycle.cycle_type || 'morning',
+    cycle_type: cycle.cycle_type || 'meeting',
     section: section,
     agenda: `「${section}」まわりの改善`,
     task: task,
@@ -129,7 +129,7 @@ function narratorPrompt(facts, userIntent) {
 登場人物は3人：部長(bucho／リーダー)、主任(shunin／レビュー担当)、プログラマー(programmer／実装担当)。
 
 【今日の事実 — これだけに基づいて脚色すること。事実にないことを足さない】
-- 種別：${facts.cycle_type === 'morning' ? '朝礼' : 'ランチ'}
+- 種別：${facts.cycle_type === 'morning' ? '朝礼' : facts.cycle_type === 'lunch' ? 'ランチ' : '開発会議'}
 - 改善した部分：${facts.agenda}
 - 実装タスク：${facts.task}
 - 結果：${facts.success ? '成功（動作確認OK）' : '不成功（修正が必要）'}
