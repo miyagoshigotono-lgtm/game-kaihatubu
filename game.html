@@ -152,8 +152,10 @@ function addParticle(x, y, color, life = 1.0) {
 
 // ===SECTION:ECOSYSTEM===
 function mutate(val, nutrient) {
-  const factor = Math.max(0.2, Math.min(1.0, nutrient / 5.0));
-  return Math.max(0.1, val * (0.95 + Math.random() * 0.1 * factor));
+  const stability = 0.98;
+  const intensity = 0.15 * Math.max(0.5, Math.min(2.0, 1.0 / (nutrient + 0.1)));
+  const variation = 1 + (Math.random() * intensity * 2 - intensity);
+  return Math.max(0.01, val * variation * stability);
 }
 
 function createMonster(x, y, type, parentGenes = null, generation = 1, parentId = 0, nutrient = 1.0) {
@@ -162,18 +164,20 @@ function createMonster(x, y, type, parentGenes = null, generation = 1, parentId 
     metabolism: mutate(parentGenes.metabolism, nutrient),
     reproThreshold: mutate(parentGenes.reproThreshold, nutrient),
     size: mutate(parentGenes.size, nutrient),
+    attackRange: mutate(parentGenes.attackRange || 1.0, nutrient),
     appearance: {
       shapeType: parentGenes.appearance.shapeType,
-      colorBase: Math.max(0, Math.min(360, parentGenes.appearance.colorBase + (Math.random() * 40 - 20)))
+      colorBase: Math.max(0, Math.min(360, parentGenes.appearance.colorBase + (Math.random() * 60 - 30)))
     }
   } : {
-    speed: 0.5 + (nutrient * 0.2),
-    metabolism: 0.5 + (nutrient * 0.2),
-    reproThreshold: 80 + (nutrient * 20),
-    size: 0.5 + (nutrient * 0.5),
+    speed: 0.5 + (Math.random() * 0.5),
+    metabolism: 0.5 + (Math.random() * 0.5),
+    reproThreshold: 70 + (Math.random() * 60),
+    size: 0.8 + (Math.random() * 0.4),
+    attackRange: 1.0 + (Math.random() * 0.5),
     appearance: {
-      shapeType: type === 1 ? Math.floor(Math.random() * 2) + 2 : Math.floor(Math.random() * 2),
-      colorBase: type === 1 ? 0 + Math.random() * 40 : 180 + Math.random() * 60
+      shapeType: type === 1 ? Math.floor(Math.random() * 3) + 3 : Math.floor(Math.random() * 3),
+      colorBase: type === 1 ? Math.random() * 60 : 180 + Math.random() * 100
     }
   };
 
@@ -183,10 +187,11 @@ function createMonster(x, y, type, parentGenes = null, generation = 1, parentId 
     generation,
     x, y,
     type,
-    hp: 20 * genes.size,
-    energy: 50 * genes.size,
+    hp: 50 * genes.size,
+    maxHp: 50 * genes.size,
+    energy: 30 * genes.size,
     genes,
-    lastMoveTime: 0,
+    lastMoveTime: performance.now(),
     isSettled: false
   };
 
@@ -197,15 +202,16 @@ function createMonster(x, y, type, parentGenes = null, generation = 1, parentId 
 function checkPredation(cellMonsters) {
   const predators = cellMonsters.filter(m => m.type === 1);
   const preys = cellMonsters.filter(m => m.type === 0);
-
   if (predators.length === 0 || preys.length === 0) return;
 
-  predators.forEach(predator => {
+  const preyRatio = preys.length / (predators.length + preys.length);
+  
+  predators.forEach(p => {
     const target = preys[Math.floor(Math.random() * preys.length)];
-    const damage = 5 * predator.genes.size;
+    const damage = (10 * p.genes.size) * (1.0 + (1.0 - preyRatio));
     target.hp -= damage;
-    predator.energy += damage * 0.5;
-
+    p.energy += (damage * 0.8) * p.genes.metabolism;
+    
     if (target.hp <= 0) {
       game.monsters = game.monsters.filter(m => m.id !== target.id);
     }
@@ -214,13 +220,11 @@ function checkPredation(cellMonsters) {
 
 function updateGrid() {
   game.grid = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => []));
-
+  
   game.monsters.forEach(m => {
-    const gx = Math.floor(m.x);
-    const gy = Math.floor(m.y);
-    if (gx >= 0 && gx < COLS && gy >= 0 && gy < ROWS) {
-      game.grid[gx][gy].push(m);
-    }
+    const gx = Math.max(0, Math.min(COLS - 1, Math.floor(m.x)));
+    const gy = Math.max(0, Math.min(ROWS - 1, Math.floor(m.y)));
+    game.grid[gx][gy].push(m);
   });
 
   for (let x = 0; x < COLS; x++) {
@@ -233,18 +237,18 @@ function updateGrid() {
 }
 
 function resize() {
-  const pixelRatio = window.devicePixelRatio || 1;
-  const availW = window.innerWidth;
-  const availH = window.innerHeight - 60;
-  TILE = Math.floor(Math.min(availW / COLS, availH / ROWS));
-
-  canvas.width = COLS * TILE * pixelRatio;
-  canvas.height = (ROWS * TILE) * pixelRatio;
+  const dpr = window.devicePixelRatio || 1;
+  const w = window.innerWidth * 0.8;
+  const h = window.innerHeight * 0.8;
+  TILE = Math.floor(Math.min(w / COLS, h / ROWS));
+  
+  canvas.width = COLS * TILE * dpr;
+  canvas.height = ROWS * TILE * dpr;
   canvas.style.width = (COLS * TILE) + "px";
   canvas.style.height = (ROWS * TILE) + "px";
-
+  
   const ctx = canvas.getContext('2d');
-  ctx.scale(pixelRatio, pixelRatio);
+  ctx.scale(dpr, dpr);
 }
 // ===END:ECOSYSTEM===
 

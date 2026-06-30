@@ -9,13 +9,12 @@
     "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
   },
   "recent_sections": [
-    "UPDATE",
     "STATE",
     "RENDER",
-    "INIT_INPUT"
+    "INIT_INPUT",
+    "ECOSYSTEM"
   ],
   "implemented_features": [
-    "[ECOSYSTEM] 捕食者数/被食者数比率連動型代謝コスト（preyRatio * K）",
     "[ECOSYSTEM] 遺伝子パラメータ（speed/metabolism/reproThreshold/size）による個体差",
     "[UPDATE] 捕食・繁殖・移動のメインループ",
     "[UPDATE] 勇者の栄養密度+魔物密度スコアによる自律侵攻AI",
@@ -44,7 +43,8 @@
     "[UPDATE] update(dt)関数内に、魔王の移動と掘削の入力処理を統合したメインループを実装する。具体的には、キーボードイベントリスナーから送られてくる入力キューを処理…",
     "[STATE] gameオブジェクト内に『キー入力キュー』と『移動・掘削の入力判定フラグ』を追加し、キー押下時に即座に状態を更新するのではなく、一度バッファに格納してからメイン…",
     "[RENDER] render()関数を刷新し、現在のgame.map[x][y]の状態（WALLならグレー、GROUNDなら黒、魔王位置なら発光エフェクト）をタイルベースで描画…",
-    "[INIT_INPUT] キーボード入力イベントリスナーを刷新し、WASDキー押下時に『game.inputQueue』へ移動または掘削の意図をプッシュする処理を実装する。具体的には、プ…"
+    "[INIT_INPUT] キーボード入力イベントリスナーを刷新し、WASDキー押下時に『game.inputQueue』へ移動または掘削の意図をプッシュする処理を実装する。具体的には、プ…",
+    "[ECOSYSTEM] createMonster関数の実装を完了させる。引数(x, y, type, parentGenes, generation, parentId, nutri…"
   ],
   "failed_approaches": [
     "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",
