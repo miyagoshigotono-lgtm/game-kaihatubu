@@ -251,6 +251,7 @@ function resize() {
 // ===SECTION:INIT_INPUT===
 let playerX = Math.floor(COLS / 2);
 let playerY = 0;
+game.inputQueue = [];
 
 function init() {
   resize();
@@ -262,12 +263,11 @@ function init() {
   game.digsLeft = 10 + (game.round - 1) * 2;
   game.interferencePoints = 5 + game.round;
   
-  // 魔王の初期位置を壁から空き地に変更（スタート地点を確保）
   playerX = Math.floor(COLS / 2);
   playerY = 0;
   game.map[playerX][playerY].type = 'ground';
   
-  game.message = `ラウンド ${game.round}：WASD/矢印キーで移動・隣接壁を掘削。残り掘削回数:${game.digsLeft}`;
+  game.message = `ラウンド ${game.round}：WASDで移動・隣接壁へ移動で掘削開始。残り回数:${game.digsLeft}`;
   updateGrid();
 }
 
@@ -278,12 +278,10 @@ function dig(x, y) {
   game.map[x][y].type = 'ground';
   game.digsLeft--;
 
-  // 魔物自動生成ロジック
   const monsterTypes = ['slime', 'bat', 'skeleton'];
   const type = monsterTypes[Math.floor(Math.random() * monsterTypes.length)];
   game.monsters.push(createMonster(x, y, type));
 
-  // 掘削完了判定
   if (game.digsLeft <= 0) {
     game.phase = 'battle';
     game.message = '掘削終了。勇者の侵攻が始まった！';
@@ -297,34 +295,39 @@ function dig(x, y) {
   return true;
 }
 
-window.addEventListener('keydown', (e) => {
-  if (game.phase === 'over') { game.round = 1; init(); return; }
-  if (game.phase !== 'dig') return;
-
+function handleInput(key) {
   const moves = {
-    'ArrowUp': [0, -1], 'w': [0, -1],
-    'ArrowDown': [0, 1], 's': [0, 1],
-    'ArrowLeft': [-1, 0], 'a': [-1, 0],
-    'ArrowRight': [1, 0], 'd': [1, 0]
+    'w': [0, -1], 's': [0, 1], 'a': [-1, 0], 'd': [1, 0],
+    'ArrowUp': [0, -1], 'ArrowDown': [0, 1], 'ArrowLeft': [-1, 0], 'ArrowRight': [1, 0]
   };
 
-  if (!moves[e.key]) return;
-
-  const [dx, dy] = moves[e.key];
+  if (!moves[key]) return;
+  const [dx, dy] = moves[key];
   const nx = playerX + dx;
   const ny = playerY + dy;
 
   if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
     if (game.map[nx][ny].type === 'wall') {
-      // 隣接マスが壁なら掘削を試みる
-      dig(nx, ny);
+      if (dig(nx, ny)) {
+        playerX = nx;
+        playerY = ny;
+      }
     } else {
-      // 空き地なら移動する
       playerX = nx;
       playerY = ny;
     }
   }
   updateGrid();
+}
+
+window.addEventListener('keydown', (e) => {
+  if (game.phase === 'over') { game.round = 1; init(); return; }
+  if (game.phase !== 'dig') return;
+
+  game.inputQueue.push(e.key);
+  while (game.inputQueue.length > 0) {
+    handleInput(game.inputQueue.shift());
+  }
 });
 
 function onFilter(e) {
