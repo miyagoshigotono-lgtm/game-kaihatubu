@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "timestamp": "2026-06-30 21:11",
+    "cycle_type": "meeting",
+    "cycle_number": 1,
+    "result": "success",
+    "target_section": "INIT_INPUT",
+    "task": "window.addEventListener('keydown', (e) => { if (game.phase === 'dig' && game.digsLeft > 0) { const dx = (e.key === 'a' ? -1 : e.key === 'd' ? 1 : 0); const dy = (e.key === 'w' ? -1 : e.key === 's' ? 1…",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
+  }
+]

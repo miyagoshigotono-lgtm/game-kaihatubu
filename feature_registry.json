@@ -9,8 +9,12 @@
     "UPDATE": "update(dt)。パーティクル・生態系・勇者・勝敗判定。",
     "RENDER": "render()。地形・魔物・勇者・魔王・パーティクル・HUDの描画。"
   },
-  "recent_sections": [],
-  "implemented_features": [],
+  "recent_sections": [
+    "INIT_INPUT"
+  ],
+  "implemented_features": [
+    "[INIT_INPUT] window.addEventListener('keydown', (e) => { if (game.phase === 'dig' && game.dig…"
+  ],
   "failed_approaches": [],
   "current_cycle": 0
 }

@@ -181,63 +181,84 @@ function updateHeroes(dt) {
 // ===END:ECOSYSTEM===
 
 // ===SECTION:INIT_INPUT===
-// ラウンド初期化と、魔王の操作（移動＝隣接壁の採掘）。
 function init() {
-  if (!game.round || game.round < 1) game.round = 1;
+  game.round = game.round || 1;
   game.phase = 'dig';
-  game.digsLeft = 10 + (game.round - 1) * 2;
+  game.digsLeft = 10 + (game.round - 1) * 3;
   game.player = { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) };
   game.monsters = [];
   game.heroes = [];
   game.particles = [];
 
-  game.map = [];
-  for (let x = 0; x < COLS; x++) {
-    game.map[x] = [];
-    for (let y = 0; y < ROWS; y++) game.map[x][y] = { wall: true, filter: null };
-  }
+  game.map = Array.from({ length: COLS }, () =>
+    Array.from({ length: ROWS }, () => ({ wall: true, monster: null }))
+  );
   game.map[game.player.x][game.player.y].wall = false;
 
-  game.message = 'ラウンド' + game.round + '：WASD/矢印キーで移動。壁に進むと掘れる（残り ' + game.digsLeft + '）';
+  updateUI();
+}
+
+function updateUI() {
+  const status = game.phase === 'dig' ? `残り採掘数: ${game.digsLeft}` : '戦闘中：魔物たちの自律行動を観測せよ';
+  game.message = `[ROUND ${game.round}] ${status}`;
+}
+
+function spawnMonster(x, y) {
+  const types = ['スライム', 'ゴブリン', 'コウモリ'];
+  const monster = {
+    x, y, 
+    type: types[Math.floor(Math.random() * types.length)],
+    hp: 10 + game.round * 2,
+    atk: 2 + Math.floor(game.round / 2)
+  };
+  game.monsters.push(monster);
+  game.map[x][y].monster = monster;
+  addParticle(x, y, '#4a90e2');
 }
 
 function startBattle() {
   game.phase = 'battle';
-  spawnHeroes(2 + game.round);
-  game.message = '勇者が侵攻してきた！魔物たちよ、迎え撃て！';
+  const heroCount = 2 + Math.floor(game.round / 2);
+  for (let i = 0; i < heroCount; i++) {
+    game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 20 + game.round * 5 });
+  }
+  updateUI();
 }
 
 function tryMove(dx, dy) {
-  if (game.phase === 'over' || game.phase === 'win') { game.round = (game.phase === 'win') ? game.round : 1; init(); return; }
-  const nx = game.player.x + dx, ny = game.player.y + dy;
-  if (!inBounds(nx, ny)) return;
-  const cell = game.map[nx][ny];
+  if (game.phase !== 'dig') return;
 
-  if (cell.wall) {
-    if (game.phase !== 'dig' || game.digsLeft <= 0) return;
-    cell.wall = false;
-    game.digsLeft--;
-    addParticle(nx, ny, '#c879ff');
-    if (Math.random() < 0.7) spawnMonster(nx, ny);   // 掘った土から魔物が生まれる
-    game.player.x = nx; game.player.y = ny;
-    if (game.digsLeft <= 0) startBattle();
-    else game.message = '採掘中… 残り ' + game.digsLeft;
-  } else {
-    game.player.x = nx; game.player.y = ny;
+  const nx = game.player.x + dx;
+  const ny = game.player.y + dy;
+
+  if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+    if (game.map[nx][ny].wall) {
+      if (game.digsLeft > 0) {
+        game.map[nx][ny].wall = false;
+        game.digsLeft--;
+        game.player.x = nx;
+        game.player.y = ny;
+        
+        if (Math.random() < 0.6) spawnMonster(nx, ny);
+        addParticle(nx, ny, '#8b4513');
+        
+        if (game.digsLeft <= 0) startBattle();
+        else updateUI();
+      }
+    } else {
+      game.player.x = nx;
+      game.player.y = ny;
+    }
   }
 }
 
-function onKey(e) {
-  const k = (e.key || '').toLowerCase();
-  const moves = {
-    'arrowup': [0, -1], 'w': [0, -1],
-    'arrowdown': [0, 1], 's': [0, 1],
-    'arrowleft': [-1, 0], 'a': [-1, 0],
-    'arrowright': [1, 0], 'd': [1, 0]
-  };
-  if (moves[k]) { e.preventDefault(); tryMove(moves[k][0], moves[k][1]); }
-}
-window.addEventListener('keydown', onKey);
+window.addEventListener('keydown', (e) => {
+  const mapping = { 'w': [0, -1], 'a': [-1, 0], 's': [0, 1], 'd': [1, 0], 'ArrowUp': [0, -1], 'ArrowLeft': [-1, 0], 'ArrowDown': [0, 1], 'ArrowRight': [1, 0] };
+  if (mapping[e.key]) {
+    const [dx, dy] = mapping[e.key];
+    tryMove(dx, dy);
+  }
+});
 // ===END:INIT_INPUT===
 
 // ===SECTION:UPDATE===
