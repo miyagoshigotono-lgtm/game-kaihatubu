@@ -434,6 +434,16 @@ async function main() {
     fs.writeFileSync('logs.json', JSON.stringify(logs, null, 2) + '\n', 'utf8');
     console.log(`\n[${CYCLE_TYPE}] ❌ 全試行不合格。game.html は変更しません（cycle#${cycleNumber}）。`);
   }
+
+  // 台本係：今回の会議を会話台本に翻訳（非クリティカル。失敗してもゲームは進む）
+  try {
+    const { generateTranscript } = require('./narrator.js');
+    const transcript = await generateTranscript(logs[logs.length - 1], userIntent);
+    fs.writeFileSync('transcript.json', JSON.stringify(transcript, null, 2) + '\n', 'utf8');
+    console.log(`[${CYCLE_TYPE}] 台本を書き出しました（turns:${transcript.turns.length}）`);
+  } catch (e) {
+    console.log(`[${CYCLE_TYPE}] 台本生成スキップ:`, e && e.message ? e.message : e);
+  }
 }
 
 main().catch(err => {
