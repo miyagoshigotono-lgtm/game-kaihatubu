@@ -320,12 +320,15 @@
   }
 
   async function playScript(nodes, turns){
-    // 全吹き出し非表示
-    Object.values(nodes).forEach(n=>{ n.querySelector('.bubble').style.display='none'; });
+    const BASE_Z = 5;
+    // 全吹き出し非表示・全員を基準の重なり順に戻す
+    Object.values(nodes).forEach(n=>{ n.querySelector('.bubble').style.display='none'; n.style.zIndex = BASE_Z; });
     for(const turn of turns){
       const node = nodes[turn.role];
       if(!node) continue;
-      Object.values(nodes).forEach(n=>{ n.querySelector('.bubble').style.display='none'; });
+      Object.values(nodes).forEach(n=>{ n.querySelector('.bubble').style.display='none'; n.style.zIndex = BASE_Z; });
+      // 喋っているキャラを最前面へ。これで吹き出しが他のキャラより必ず前に出る。
+      node.style.zIndex = 999;
       const b = node.querySelector('.bubble');
       node.querySelector('.bubble-text').textContent = turn.line;
       b.style.display='block';
@@ -393,15 +396,16 @@
     const lowSat = r && r.satisfaction && r.satisfaction <= 2;
     const treats = lsGet('treatsGiven', []);
     const streak = lsGet('streakCount', 1);
+    // 社長は盗み聞きしているだけ。社員同士の雑談・噂話にする（社長へ話しかけない）。
     const t = [];
-    t.push({ role:'shinjin', line:'あっ、社長だ！おつかれさまです！' });
-    t.push({ role:'keiri',   line:'今月もよく開発が進んでますねぇ。' });
-    if(treats.length) t.push({ role:'designer', line:'この前の差し入れ、おいしかった〜！ありがとうございます。' });
-    else t.push({ role:'designer', line:'差し入れ…ちょっと待ってたり、して。なんてね。' });
-    if(lowSat) t.push({ role:'shunin', line:'昨日の評価、きびしかったなぁ…！でも逆に燃えるよ。' });
-    else t.push({ role:'programmer', line:'最近うまくいってる気がするんだよね。' });
-    t.push({ role:'shinjin', line:`部長、社長って${streak}日も連続で来てるんですね…！` });
-    t.push({ role:'bucho',   line:'ああ。ありがたい話だ。我々も応えねばな。' });
+    t.push({ role:'shinjin', line:'主任、今日のダンジョン調整おつかれさまでした〜。' });
+    t.push({ role:'designer', line:'魔物のドット、もうちょい可愛くしたいんだよね。' });
+    if(treats.length) t.push({ role:'keiri', line:'あ、差し入れ置いてある。社長が来てたのかな？' });
+    else t.push({ role:'keiri', line:'最近、差し入れ無いね…ちょっとさみしい。' });
+    if(lowSat) t.push({ role:'programmer', line:'昨日の評価、けっこう辛口だったって噂だぞ…！' });
+    else t.push({ role:'programmer', line:'最近わりと評判いいらしいぜ。' });
+    t.push({ role:'shunin', line:`社長、${streak}日も毎日チェックしてるらしいよ。` });
+    t.push({ role:'bucho',  line:'……手を抜けんな。さて、休憩おわり、戻るぞ。' });
     return t;
   }
   let officeReady = false;
@@ -445,7 +449,7 @@
     await playScript(nodes, [
       { role:'shinjin', line:`わ、${inv[key].name}だ！いただきます！` },
       { role:'designer', line:'やる気でてきた〜！' },
-      { role:'bucho', line:'社長、いつもすまんな。' }
+      { role:'bucho', line:'ありがたく頂こう。さあ、続きを頑張るぞ。' }
     ]);
   }
 
