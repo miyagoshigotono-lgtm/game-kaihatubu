@@ -179,8 +179,9 @@
   // ===== 設定 =====
   const REPO_OWNER = 'miyagoshigotono-lgtm';
   const REPO_NAME  = 'game-kaihatubu';
-  // GASのWebアプリURL。設定すると付箋・評価・差し入れがサーバーに保存される。
-  // 空のうちは端末内(localStorage)にのみ保存される。
+  // GASのWebアプリURL。ここにデプロイ後のURLを貼ると、付箋・評価・差し入れが
+  // GAS経由でGitHubに保存される（gas/README.md 参照）。
+  // 空のうちは、これまで通り端末内(localStorage)にのみ保存される。
   const GAS_ENDPOINT = '';
 
   // 登場人物
@@ -227,12 +228,30 @@
     if(name==='office') ensureOffice();   // オフィスは常にメンバーがいる
   }
 
+  // ===== あいことば（GAS送信時のみ。初回だけ入力、この端末に保存） =====
+  function getPass(){
+    let p = localStorage.getItem('studio_pass');
+    if(!p){
+      p = prompt('あいことばを入力してください（社長だけが知っている合言葉）');
+      if(p){ p=p.trim(); localStorage.setItem('studio_pass', p); }
+    }
+    return p ? p.trim() : '';
+  }
+  function resetPass(){ localStorage.removeItem('studio_pass'); }
+
   // ===== バックエンド送信（GAS or localStorage） =====
   async function sendToBackend(type, payload){
-    if(!GAS_ENDPOINT){ return { ok:true, local:true }; }
+    if(!GAS_ENDPOINT){ return { ok:true, local:true }; }   // URL未設定＝端末内のみ
+    const pass = getPass();
+    if(!pass){ return { ok:false, error:'no pass' }; }
     try{
-      const r=await fetch(GAS_ENDPOINT,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({type,payload}) });
-      return { ok:r.ok };
+      // CORS制約のため no-cors の送りっぱなし。応答は読めないので楽観的に成功扱い。
+      await fetch(GAS_ENDPOINT, {
+        method:'POST', mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ type, pass, payload })
+      });
+      return { ok:true, sent:true };
     }catch(e){ return { ok:false, error:e.message }; }
   }
 
@@ -451,7 +470,10 @@
     const notes=lsGet('notes',[]); notes.push({ text, date: todayStr() }); lsSet('notes', notes.slice(-30));
     ta.value=''; renderNotes(); st.textContent='';
     const r=await sendToBackend('note',{ text, date: todayStr() });
-    showToast(r.local ? '付箋を机に置きました（この端末に保存）' : '付箋を置きました！次の会議で反映されます', '📌');
+    const msg = r.local ? '付箋を机に置きました（この端末に保存）'
+              : r.ok    ? '付箋を置きました！次の会議で反映されます'
+              :           '付箋はこの端末に保存しました（送信できませんでした）';
+    showToast(msg, '📌');
   }
 
   // ===== 評価（2軸★） =====
@@ -478,7 +500,9 @@
     renderRatings();
     const st=document.getElementById('ratingStatus');
     const r=await sendToBackend('rating',{ ...saved, date: todayStr() });
-    st.textContent = r.local ? 'この端末に評価を記録しました。' : '評価を送りました！明日の開発に反映されます。';
+    st.textContent = r.local ? 'この端末に評価を記録しました。'
+                   : r.ok    ? '評価を送りました！明日の開発に反映されます。'
+                   :           '評価はこの端末に記録しました（送信できませんでした）。';
     st.className='status-line';
     showToast('⭐ 評価ありがとう！', '⭐');
   }
