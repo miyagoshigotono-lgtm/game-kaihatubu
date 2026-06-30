@@ -1,56 +1,16 @@
 {
-  "version": 2,
+  "version": 3,
+  "reset_note": "バージョン0として基盤を再構築。ここから開発を再スタート。",
   "sections": {
-    "CONFIG": "定数・Canvas初期化・グリッドサイズ(COLS/ROWS)・TILE計算・HUD高さ・mouseX/Y変数。変更は慎重に。",
-    "STATE": "gameオブジェクト定義。monsters/heroes/phase/round/digsLeft/map/grid/message。新状態変数はここに追加する。",
-    "ECOSYSTEM": "mutate()・createMonster()・遺伝子継承・updateGrid()・resize()。魔物生成と生態系の核。",
-    "INIT_INPUT": "init()（ラウンド初期化）とonDig()（クリック掘削ハンドラ）。掘削制限・魔物自動生成・勇者出現。",
-    "UPDATE": "update(dt)。毎フレームの魔物移動・捕食・繁殖・勇者AI侵攻・攻撃・勝敗判定。",
-    "RENDER": "render()。地形・魔物・勇者・HUD・エフェクト・マウスオーバーの全Canvas描画。ビジュアル品質に直結。"
+    "CONFIG": "定数・Canvas初期化・グリッド設定(COLS/ROWS/TILE/HUD)・resize()。共有の土台。",
+    "STATE": "gameオブジェクト（唯一の状態）とマップ操作ヘルパー(inBounds/isGround/addParticle)。",
+    "ECOSYSTEM": "createMonster/spawnMonster・生態系(移動/捕食/繁殖)・勇者AI(spawnHeroes/updateHeroes)。",
+    "INIT_INPUT": "init()ラウンド初期化・startBattle()・tryMove()・onKey()。魔王の操作(WASD移動=隣接壁の採掘)。",
+    "UPDATE": "update(dt)。パーティクル・生態系・勇者・勝敗判定。",
+    "RENDER": "render()。地形・魔物・勇者・魔王・パーティクル・HUDの描画。"
   },
-  "recent_sections": [
-    "RENDER",
-    "INIT_INPUT",
-    "ECOSYSTEM",
-    "UPDATE"
-  ],
-  "implemented_features": [
-    "[UPDATE] 捕食・繁殖・移動のメインループ",
-    "[UPDATE] 勇者の栄養密度+魔物密度スコアによる自律侵攻AI",
-    "[INIT_INPUT] クリック掘削・ラウンド制限・魔物自動生成・勇者出現トリガー",
-    "[RENDER] 地形の栄養値による色グラデーション描画",
-    "[RENDER] 魔物をタイプ別色円・勇者を白四角で描画",
-    "[ECOSYSTEM] createMonster関数に「外見遺伝子(appearanceCode)」を追加し、魔物のタイプごとに形状や色味を決定するロジックを実装する。具体的には、遺…",
-    "[RENDER] render()関数内に、魔物の遺伝子情報（appearance.shapeType）に基づいた描画ロジックを実装する。具体的には、shapeType 0は円、…",
-    "[INIT_INPUT] 魔王の操作ロジックの実装。キーボードイベントリスナーを追加し、WASDまたは十字キーで魔王（プレイヤー位置変数 playerX, playerY）を移動させ、S…",
-    "[UPDATE] update(dt)関数を実装する。魔物が遺伝子のspeedに基づきグリッド内を移動するロジック、隣接する敵を捕食しエネルギーを消費・獲得する判定、energy…",
-    "[STATE] gameオブジェクト内に魔王のステータス管理用プロパティを追加し、初期状態として playerX: 10, playerY: 0 を定義する。また、魔王の視界範…",
-    "[CONFIG] マップデータ構造を保持する2次元配列の初期化ロジックを追加し、game.mapを {type: 'wall', nutrient: 0, filter: nul…",
-    "[INIT_INPUT] キーボードイベントリスナーを実装し、十字キー（ArrowUp, ArrowDown, ArrowLeft, ArrowRight）入力時に魔王の座標(playe…",
-    "[RENDER] render()関数内に、魔王の現在位置（playerX, playerY）を中心とした視界範囲（VISIBILITY_RADIUS）のみを描画する「フォグ・オ…",
-    "[UPDATE] 魔王の移動に合わせて隣接するwallを掘削し、groundへ変換するdig(x, y)関数を実装し、それをupdate()またはキーボードイベントから呼び出す。…",
-    "[ECOSYSTEM] updateGrid()関数を完成させ、各グリッドセル内の魔物リストを管理するロジックを実装する。具体的には、mapの各座標(x, y)に対して、現在位置がその…",
-    "[INIT_INPUT] キーボードイベントリスナーを拡張し、魔王の移動（WASD）と連動して隣接マスを掘削する『dig(x, y)』関数を実装する。掘削時には『game.digsLef…",
-    "[RENDER] render()関数内に、HUD（画面下部）の描画処理を実装する。具体的には、現在のラウンド数、残り掘削回数(digsLeft)、干渉ポイント、およびプレイヤー…",
-    "[CONFIG] マップデータ構造の定義を、現在の1次元的な配列構造から、x,y座標をキーとして直接アクセス可能なオブジェクト形式、またはグリッド計算を最適化した2次元配列構造へ…",
-    "[STATE] gameオブジェクト内に『掘削履歴ログ』と『魔王のインベントリ（所持している栄養素の総量）』を管理するプロパティを追加し、掘削時に発生するイベントを記録する配列…",
-    "[UPDATE] update(dt)関数内に、魔王の移動および掘削後の「魔物生成ロジック」を実装する。具体的には、掘削によってtypeが'wall'から'ground'に変化し…",
-    "[RENDER] render()関数を拡張し、魔王の現在位置（playerX, playerY）を視覚的に強調する専用の描画ロジックを追加する。具体的には、魔王の座標に半透明の…",
-    "[INIT_INPUT] キーボード入力（WASD）を「移動」と「掘削」に分離する。具体的には、キー入力時に隣接マスが壁なら掘削アクション（dig関数実行）、空き地なら移動アクション（p…",
-    "[ECOSYSTEM] createMonster関数を完成させ、遺伝子情報の初期化および栄養素に基づいた魔物のステータス生成ロジックを実装する。具体的には、引数に受け取ったnutri…",
-    "[CONFIG] マップデータ構造を、現在のオブジェクト形式から、2次元配列（game.map[x][y]）へ統一・再構築する。具体的には、initMap関数を修正し、map[x…",
-    "[UPDATE] update(dt)関数内に、魔王の移動と掘削の入力処理を統合したメインループを実装する。具体的には、キーボードイベントリスナーから送られてくる入力キューを処理…",
-    "[STATE] gameオブジェクト内に『キー入力キュー』と『移動・掘削の入力判定フラグ』を追加し、キー押下時に即座に状態を更新するのではなく、一度バッファに格納してからメイン…",
-    "[RENDER] render()関数を刷新し、現在のgame.map[x][y]の状態（WALLならグレー、GROUNDなら黒、魔王位置なら発光エフェクト）をタイルベースで描画…",
-    "[INIT_INPUT] キーボード入力イベントリスナーを刷新し、WASDキー押下時に『game.inputQueue』へ移動または掘削の意図をプッシュする処理を実装する。具体的には、プ…",
-    "[ECOSYSTEM] createMonster関数の実装を完了させる。引数(x, y, type, parentGenes, generation, parentId, nutri…",
-    "[UPDATE] update(dt)関数内に、キー入力キューを消費して魔王の移動（WASDで隣接GROUNDへ）と掘削（隣接WALLをGROUNDへ変換しdigsLeftを減ら…"
-  ],
-  "failed_approaches": [
-    "[RENDER] [QA却下] 提供されたコードには、以下の問題があります。\n\n1. `update`関数内の`...`（省略記号）により…",
-    "[UPDATE] [QA却下] コードの末尾が「game.monsters…」で途切れており、構文エラー（Unexpected end o…",
-    "[STATE] [QA却下] FAIL\nSECTION:ECOSYSTEM内のcreateMonster関数が、SECTION:STAT…"
-  ],
-  "current_cycle": 20,
-  "notes": "v2: セクション分割による外科的改善方式に移行。1サイクルで1セクションのみを改善する。"
+  "recent_sections": [],
+  "implemented_features": [],
+  "failed_approaches": [],
+  "current_cycle": 0
 }

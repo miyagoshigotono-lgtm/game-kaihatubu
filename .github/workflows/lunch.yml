@@ -1,8 +1,10 @@
 name: Lunch Meeting (ランチ)
 
 on:
-  schedule:
-    - cron: '30 * * * *'
+  # バージョン0の基盤を保護するため定期実行を一時停止中。
+  # 安全な夜バッチ（実行ゲート付き）へ移行したら schedule を復活させる。
+  # schedule:
+  #   - cron: '30 * * * *'
   workflow_dispatch:
 
 permissions:
