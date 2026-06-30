@@ -38,5 +38,15 @@
     "task": "gameオブジェクト内に、採掘した壁の履歴を管理する二次元配列 `map[COLS][ROWS]` の初期化ロジックを追加し、`game.map[x][y] = { wall: true, health: 100 }` のように壁の耐久値や属性を保持できる構造へと拡張する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-06-30 21:56",
+    "cycle_type": "meeting",
+    "cycle_number": 5,
+    "result": "success",
+    "target_section": "INIT_INPUT",
+    "task": "キーボードイベントリスナーを実装し、魔王（player）の座標をWASDキーで移動させ、隣接する壁に対してスペースキーまたはEnterキーで採掘（dig）を実行するロジックを追加する。採掘時はgame.digsLeftを減算し、壁を地面に変更した上でspawnMonster(x, y)を呼び出し、魔物を生成する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

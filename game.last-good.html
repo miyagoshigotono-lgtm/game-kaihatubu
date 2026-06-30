@@ -207,12 +207,9 @@ function init() {
   );
   game.map[game.player.x][game.player.y].wall = false;
 
-  updateUI();
-}
-
-function updateUI() {
-  const status = game.phase === 'dig' ? `残り採掘数: ${game.digsLeft}` : '戦闘中：魔物たちの自律行動を観測せよ';
-  game.message = `[ROUND ${game.round}] ${status}`;
+  if (typeof updateUI === 'function') {
+    updateUI();
+  }
 }
 
 function spawnMonster(x, y) {
@@ -225,7 +222,7 @@ function spawnMonster(x, y) {
   };
   game.monsters.push(monster);
   game.map[x][y].monster = monster;
-  addParticle(x, y, '#4a90e2');
+  if (typeof addParticle === 'function') addParticle(x, y, '#4a90e2');
 }
 
 function startBattle() {
@@ -234,41 +231,58 @@ function startBattle() {
   for (let i = 0; i < heroCount; i++) {
     game.heroes.push({ x: 0, y: Math.floor(Math.random() * ROWS), hp: 20 + game.round * 5 });
   }
-  updateUI();
+  if (typeof updateUI === 'function') updateUI();
 }
 
-function tryMove(dx, dy) {
-  if (game.phase !== 'dig') return;
-
-  const nx = game.player.x + dx;
-  const ny = game.player.y + dy;
-
-  if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
-    if (game.map[nx][ny].wall) {
-      if (game.digsLeft > 0) {
-        game.map[nx][ny].wall = false;
-        game.digsLeft--;
-        game.player.x = nx;
-        game.player.y = ny;
-        
-        if (Math.random() < 0.6) spawnMonster(nx, ny);
-        addParticle(nx, ny, '#8b4513');
-        
-        if (game.digsLeft <= 0) startBattle();
-        else updateUI();
-      }
+function onDig(nx, ny) {
+  if (game.digsLeft > 0 && game.map[nx][ny].wall) {
+    game.map[nx][ny].wall = false;
+    game.digsLeft--;
+    spawnMonster(nx, ny);
+    if (typeof addParticle === 'function') addParticle(nx, ny, '#8b4513');
+    
+    if (game.digsLeft <= 0) {
+      startBattle();
     } else {
-      game.player.x = nx;
-      game.player.y = ny;
+      updateUI();
     }
   }
 }
 
 window.addEventListener('keydown', (e) => {
-  const mapping = { 'w': [0, -1], 'a': [-1, 0], 's': [0, 1], 'd': [1, 0], 'ArrowUp': [0, -1], 'ArrowLeft': [-1, 0], 'ArrowDown': [0, 1], 'ArrowRight': [1, 0] };
+  if (game.phase !== 'dig') return;
+
+  const mapping = { 
+    'w': [0, -1], 'a': [-1, 0], 's': [0, 1], 'd': [1, 0],
+    'ArrowUp': [0, -1], 'ArrowLeft': [-1, 0], 'ArrowDown': [0, 1], 'ArrowRight': [1, 0] 
+  };
+
   if (mapping[e.key]) {
     const [dx, dy] = mapping[e.key];
-    tryMove(dx, dy);
+    const nx = game.player.x + dx;
+    const ny = game.player.y + dy;
+
+    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+      if (game.map[nx][ny].wall) {
+        if (e.key === ' ' || e.key === 'Enter') {
+            onDig(nx, ny);
+        }
+      } else {
+        game.player.x = nx;
+        game.player.y = ny;
+        updateUI();
+      }
+    }
+  } else if (e.key === ' ' || e.key === 'Enter') {
+      const neighbors = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+      for (const [dx, dy] of neighbors) {
+          const nx = game.player.x + dx;
+          const ny = game.player.y + dy;
+          if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny].wall) {
+              onDig(nx, ny);
+              break;
+          }
+      }
   }
 });
 // ===END:INIT_INPUT===
