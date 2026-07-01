@@ -13,15 +13,22 @@
   <canvas id="gameCanvas"></canvas>
   <script>
 // ===SECTION:CONFIG===
-// 定数・Canvas初期化・グリッド設定・画面リサイズ。ゲーム全体で共有する土台。
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-const COLS = 20;       // 横マス数
-const ROWS = 14;       // 縦マス数
-const HUD = 70;        // 画面下部の情報表示エリアの高さ(px)
-let TILE = 32;         // 1マスのピクセルサイズ（resizeで決定）
-let monsterId = 0;     // 魔物の通し番号
+const COLS = 20;
+const ROWS = 14;
+const HUD = 70;
+let TILE = 32;
+let monsterId = 0;
+let scaleFactor = 1;
+
+const GAME_PARAMS = {
+  moveSpeed: 0.15,
+  digCooldown: 300,
+  spawnRate: 0.05,
+  maxEnergy: 100
+};
 
 const COLORS = {
   ground:   '#15101f',
@@ -34,17 +41,34 @@ const COLORS = {
   hud:      '#181222'
 };
 
+let mouseX = 0;
+let mouseY = 0;
+
 function resize() {
-  const ratio = window.devicePixelRatio || 1;
+  const pixelRatio = window.devicePixelRatio || 1;
   const availW = Math.min(window.innerWidth, 1200);
   const availH = window.innerHeight - HUD - 4;
-  TILE = Math.max(12, Math.floor(Math.min(availW / COLS, availH / ROWS)));
-  canvas.width = COLS * TILE * ratio;
-  canvas.height = (ROWS * TILE + HUD) * ratio;
+  
+  TILE = Math.max(16, Math.floor(Math.min(availW / COLS, availH / ROWS)));
+  scaleFactor = TILE / 32;
+
+  canvas.width = (COLS * TILE) * pixelRatio;
+  canvas.height = (ROWS * TILE + HUD) * pixelRatio;
+  
   canvas.style.width = (COLS * TILE) + 'px';
   canvas.style.height = (ROWS * TILE + HUD) + 'px';
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  
+  ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 }
+
+window.addEventListener('resize', resize);
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = (e.clientX - rect.left) / TILE;
+  mouseY = (e.clientY - rect.top) / TILE;
+});
+
+resize();
 // ===END:CONFIG===
 
 // ===SECTION:STATE===
