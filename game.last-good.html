@@ -76,7 +76,11 @@ const game = {
   round: 1,
   phase: 'dig',
   digsLeft: 12,
-  player: { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) },
+  player: {
+    x: Math.floor(COLS / 2),
+    y: Math.floor(ROWS / 2),
+    canDig: { up: false, down: false, left: false, right: false }
+  },
   map: Array.from({ length: COLS }, (_, x) =>
     Array.from({ length: ROWS }, (_, y) => ({
       wall: true,
@@ -93,6 +97,18 @@ const game = {
 
 function inBounds(x, y) {
   return x >= 0 && x < COLS && y >= 0 && y < ROWS;
+}
+
+function canDig(x, y) {
+  return inBounds(x, y) && game.map[x][y].wall;
+}
+
+function updateDigAvailability() {
+  const p = game.player;
+  p.canDig.up = canDig(p.x, p.y - 1);
+  p.canDig.down = canDig(p.x, p.y + 1);
+  p.canDig.left = canDig(p.x - 1, p.y);
+  p.canDig.right = canDig(p.x + 1, p.y);
 }
 
 function isGround(x, y) {
