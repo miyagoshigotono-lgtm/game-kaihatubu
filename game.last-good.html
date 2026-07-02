@@ -144,19 +144,33 @@ function createMonster(x, y, type) {
   };
 }
 
+function digTile(x, y) {
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS || !game.map[y][x].wall) return;
+
+  game.map[y][x].wall = false;
+  
+  // 採掘時の爽快感：土の破片パーティクルを複数生成
+  for (let i = 0; i < 8; i++) {
+    addParticle(x, y, '#8B4513');
+  }
+
+  // 掘削地点から生態系が発生
+  spawnMonster(x, y, 0.3);
+}
+
 function spawnMonster(x, y, chainChance = 0.2) {
   const type = Math.random() < 0.35 ? 1 : 0;
   game.monsters.push(createMonster(x, y, type));
   
-  // 生態系発生アルゴリズム：土の破片から連鎖的に魔物が発生
+  // 生態系発生アルゴリズム：土の残滓から��鎖的に魔物が発生
   if (Math.random() < chainChance) {
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     for (const [dx, dy] of dirs) {
       const nx = x + dx, ny = y + dy;
       if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[ny][nx].wall) {
-        // 確率で壁を侵食して魔物を発生させる（ダンジョンの生命力��出）
         if (Math.random() < 0.4) {
           game.map[ny][nx].wall = false;
+          addParticle(nx, ny, '#553311');
           spawnMonster(nx, ny, chainChance * 0.5);
           break;
         }

@@ -128,5 +128,15 @@
     "task": "render()関数内に、採掘可能範囲（プレイヤーの上下左右の壁）を視覚的に強調するハイライト描画を追加する。具体的には、game.player.canDigの各フラグ（up/down/left/right）がtrueの場合、対象となる壁マスの外枠に色（例: COLORS.playerの半透明版）で枠線を描画し、プレイヤーがどこを掘れるかを直感的に判別できるようにする。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-07-03 05:04",
+    "cycle_type": "meeting",
+    "cycle_number": 14,
+    "result": "success",
+    "target_section": "ECOSYSTEM",
+    "task": "digTile(x, y)関数を実装し、壁を破壊した際に周囲の地面マスを走査してspawnMonster(x, y)を呼び出すロジックを統合する。また、壁破壊時に発生する土の破片（パーティクル）の生成処理をaddParticle()を用いて追加し、採掘の爽快感を高める。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]
