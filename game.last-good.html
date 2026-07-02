@@ -336,70 +336,83 @@ window.addEventListener('keydown', (e) => {
 
 // ===SECTION:UPDATE===
 function update(dt) {
-  // パーティクル更新
+  // 1. クールダウン管理
+  if (game.digCooldown > 0) game.digCooldown -= dt;
+
+  // 2. 魔王の移動と採掘ロジック
+  if (game.phase === 'dig' && game.digCooldown <= 0) {
+    let nextX = game.player.x;
+    let nextY = game.player.y;
+    let moved = false;
+
+    if (game.keys['w']) { nextY -= 1; moved = true; }
+    else if (game.keys['s']) { nextY += 1; moved = true; }
+    else if (game.keys['a']) { nextX -= 1; moved = true; }
+    else if (game.keys['d']) { nextX += 1; moved = true; }
+
+    if (moved) {
+      if (game.map[nextY] && game.map[nextY][nextX] === 1) { // 1:壁
+        game.map[nextY][nextX] = 0; // 壁を掘削
+        spawnMonster(nextX, nextY);
+        game.digCooldown = 0.5; // 採掘クールダウン
+      } else if (game.map[nextY] && game.map[nextY][nextX] === 0) {
+        game.player.x = nextX;
+        game.player.y = nextY;
+        game.digCooldown = 0.2; // 移動クールダウン
+      }
+    }
+  }
+
+  // 3. パーティクル更新
   for (let i = game.particles.length - 1; i >= 0; i--) {
     const p = game.particles[i];
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.5;
     if (p.life <= 0) game.particles.splice(i, 1);
   }
 
-  // 魔物の生死判定と更新
+  // 4. 魔物更新と生死判定
   for (let i = game.monsters.length - 1; i >= 0; i--) {
     const m = game.monsters[i];
+    // ここに生態系（捕食・移動）の更新ロジックを統合
     if (m.hp <= 0) {
       game.monsters.splice(i, 1);
-      continue;
     }
   }
 
-  // フェイズごとのロジック
-  if (game.phase === 'dig') {
-    updateEcosystem(dt);
-  } else if (game.phase === 'battle') {
-    updateEcosystem(dt);
-
-    // 勇者AI：最短距離での移動と攻撃
+  // 5. 勇者AIとバトルロジック
+  if (game.phase === 'battle') {
     for (let h of game.heroes) {
-      let targetMonster = null;
-      let minDistance = Infinity;
-
-      // 最も近い魔物を探索
+      let target = null;
+      let minD = Infinity;
       for (let m of game.monsters) {
-        const dist = Math.abs(h.x - m.x) + Math.abs(h.y - m.y);
-        if (dist < minDistance) {
-          minDistance = dist;
-          targetMonster = m;
-        }
+        const d = Math.abs(h.x - m.x) + Math.abs(h.y - m.y);
+        if (d < minD) { minD = d; target = m; }
       }
 
-      if (targetMonster) {
-        if (minDistance <= 1) {
-          // 隣接時は攻撃
-          targetMonster.hp -= h.atk * dt;
+      if (target) {
+        if (minD <= 1) {
+          target.hp -= h.atk * dt;
         } else {
-          // マンハッタン距離で接近
-          if (h.x < targetMonster.x) h.x += h.speed * dt;
-          else if (h.x > targetMonster.x) h.x -= h.speed * dt;
-          else if (h.y < targetMonster.y) h.y += h.speed * dt;
-          else if (h.y > targetMonster.y) h.y -= h.speed * dt;
+          h.x += (h.x < target.x ? 1 : -1) * h.speed * dt;
+          h.y += (h.y < target.y ? 1 : -1) * h.speed * dt;
         }
       }
     }
 
-    // 勇者の生死判定
+    // 勇者生死判定
     for (let i = game.heroes.length - 1; i >= 0; i--) {
       if (game.heroes[i].hp <= 0) game.heroes.splice(i, 1);
     }
+  }
 
-    // 勝敗判定
-    if (game.heroes.length === 0) {
-      game.phase = 'win';
-      game.round++;
-      game.message = '防衛成功！ ラウンド' + game.round + 'へ（WASDで再開）';
-    } else if (game.monsters.length === 0) {
-      game.phase = 'over';
-      game.message = '魔物が全滅した… 敗北（WASDで再挑戦）';
-    }
+  // 6. 勝敗判定
+  if (game.heroes.length === 0 && game.phase === 'battle') {
+    game.phase = 'win';
+    game.round++;
+    game.message = '防衛成功！ ラウンド' + game.round + 'へ';
+  } else if (game.monsters.length === 0 && game.phase === 'battle') {
+    game.phase = 'over';
+    game.message = '魔物が全滅した… 敗北';
   }
 }
 // ===END:UPDATE===

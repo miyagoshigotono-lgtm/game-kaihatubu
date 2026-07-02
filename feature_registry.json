@@ -10,10 +10,10 @@
     "RENDER": "render()。地形・魔物・勇者・魔王・パーティクル・HUDの描画。"
   },
   "recent_sections": [
-    "UPDATE",
     "INIT_INPUT",
     "CONFIG",
-    "STATE"
+    "STATE",
+    "UPDATE"
   ],
   "implemented_features": [
     "[INIT_INPUT] window.addEventListener('keydown', (e) => { if (game.phase === 'dig' && game.dig…",
@@ -25,7 +25,8 @@
     "[RENDER] render()関数内に、魔王（プレイヤー）の現在位置を視覚的に強調する描画処理を追加する。具体的には、game.playerの座標(x, y)に基づき、TIL…",
     "[INIT_INPUT] キーボードイベントリスナーを修正し、WASDキーによる魔王の移動を『隣接する地面マスへの移動』に制限する。また、移動先が『壁（wall: true）』であった場…",
     "[CONFIG] CONFIGセクション内に、魔王の移動速度や採掘のクールダウン時間、および魔物の初期生成確率を制御する定数オブジェクト `GAME_PARAMS` を定義し、`…",
-    "[STATE] gameオブジェクト内に、プレイヤーの現在地を起点とした『採掘可能範囲の可視化フラグ』を管理するプロパティを追加し、プレイヤーの移動に合わせて `canDig(…"
+    "[STATE] gameオブジェクト内に、プレイヤーの現在地を起点とした『採掘可能範囲の可視化フラグ』を管理するプロパティを追加し、プレイヤーの移動に合わせて `canDig(…",
+    "[UPDATE] update(dt)関数内に、魔王の移動と採掘のクールダウン処理、およびプレイヤーの座標に基づいた採掘可能判定の更新ロジックを統合する。具体的には、game.p…"
   ],
   "failed_approaches": [
     "[UPDATE] [実行ゲートNG] 起動/実行時にエラー:\nループ実行エラー: Cannot read properties of un…"
