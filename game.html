@@ -422,7 +422,7 @@ function render() {
   const W = COLS * TILE, H = ROWS * TILE;
   ctx.clearRect(0, 0, W, H + HUD);
 
-  // 地形
+  // 地形描画
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       const c = game.map[x] && game.map[x][y];
@@ -441,6 +441,26 @@ function render() {
         ctx.strokeRect(x * TILE, y * TILE, TILE, TILE);
       }
     }
+  }
+
+  // 採掘可能範囲のハイライト
+  if (game.player && game.player.canDig) {
+    const directions = [
+      { dx: 0, dy: -1, key: 'up' },
+      { dx: 0, dy: 1, key: 'down' },
+      { dx: -1, dy: 0, key: 'left' },
+      { dx: 1, dy: 0, key: 'right' }
+    ];
+
+    ctx.strokeStyle = COLORS.player + '88';
+    ctx.lineWidth = 3;
+    directions.forEach(d => {
+      if (game.player.canDig[d.key]) {
+        const tx = (game.player.x + d.dx) * TILE;
+        const ty = (game.player.y + d.dy) * TILE;
+        ctx.strokeRect(tx + 2, ty + 2, TILE - 4, TILE - 4);
+      }
+    });
   }
 
   // 魔物
@@ -468,7 +488,7 @@ function render() {
     ctx.fillRect(h.x * TILE + TILE * 0.3, h.y * TILE + TILE * 0.25, TILE * 0.1, TILE * 0.1);
   }
 
-  // 魔王（プレイヤー）のパルスエフェクト
+  // 魔王（プレイヤー）
   const px = game.player.x * TILE, py = game.player.y * TILE;
   const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
   ctx.save();
