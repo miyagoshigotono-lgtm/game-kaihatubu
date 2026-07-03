@@ -351,29 +351,38 @@ window.addEventListener('keydown', (e) => {
 
 // ===SECTION:UPDATE===
 function update(dt) {
-  // 1. クールダウン管理
-  if (game.digCooldown > 0) game.digCooldown -= dt;
+  // 1. プレイヤーのクールダウンタイマー更新
+  game.player.lastMoveTime += dt;
+  game.player.lastDigTime += dt;
 
   // 2. 魔王の移動と採掘ロジック
-  if (game.phase === 'dig' && game.digCooldown <= 0) {
+  if (game.phase === 'dig') {
     let nextX = game.player.x;
     let nextY = game.player.y;
-    let moved = false;
+    let action = null; // 'move' or 'dig'
 
-    if (game.keys['w']) { nextY -= 1; moved = true; }
-    else if (game.keys['s']) { nextY += 1; moved = true; }
-    else if (game.keys['a']) { nextX -= 1; moved = true; }
-    else if (game.keys['d']) { nextX += 1; moved = true; }
+    if (game.keys && (game.keys['w'] || game.keys['a'] || game.keys['s'] || game.keys['d'])) {
+      if (game.keys['w']) nextY -= 1;
+      else if (game.keys['s']) nextY += 1;
+      else if (game.keys['a']) nextX -= 1;
+      else if (game.keys['d']) nextX += 1;
 
-    if (moved) {
-      if (game.map[nextY] && game.map[nextY][nextX] === 1) { // 1:壁
-        game.map[nextY][nextX] = 0; // 壁を掘削
+      const targetCell = game.map[nextY] ? game.map[nextY][nextX] : null;
+
+      if (targetCell === 1 && game.player.lastDigTime >= GAME_PARAMS.digCooldown) {
+        action = 'dig';
+      } else if (targetCell === 0 && game.player.lastMoveTime >= GAME_PARAMS.moveSpeed) {
+        action = 'move';
+      }
+
+      if (action === 'dig') {
+        game.map[nextY][nextX] = 0;
         spawnMonster(nextX, nextY);
-        game.digCooldown = 0.5; // 採掘クールダウン
-      } else if (game.map[nextY] && game.map[nextY][nextX] === 0) {
+        game.player.lastDigTime = 0;
+      } else if (action === 'move') {
         game.player.x = nextX;
         game.player.y = nextY;
-        game.digCooldown = 0.2; // 移動クールダウン
+        game.player.lastMoveTime = 0;
       }
     }
   }
@@ -381,14 +390,16 @@ function update(dt) {
   // 3. パーティクル更新
   for (let i = game.particles.length - 1; i >= 0; i--) {
     const p = game.particles[i];
-    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.5;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt * 1.5;
     if (p.life <= 0) game.particles.splice(i, 1);
   }
 
   // 4. 魔物更新と生死判定
   for (let i = game.monsters.length - 1; i >= 0; i--) {
     const m = game.monsters[i];
-    // ここに生態系（捕食・移動）の更新ロジックを統合
+    // 生態系ロジック（移動・捕食・繁殖）をここに記述
     if (m.hp <= 0) {
       game.monsters.splice(i, 1);
     }
@@ -414,20 +425,21 @@ function update(dt) {
       }
     }
 
-    // 勇者生死判定
     for (let i = game.heroes.length - 1; i >= 0; i--) {
       if (game.heroes[i].hp <= 0) game.heroes.splice(i, 1);
     }
   }
 
   // 6. 勝敗判定
-  if (game.heroes.length === 0 && game.phase === 'battle') {
-    game.phase = 'win';
-    game.round++;
-    game.message = '防衛成功！ ラウンド' + game.round + 'へ';
-  } else if (game.monsters.length === 0 && game.phase === 'battle') {
-    game.phase = 'over';
-    game.message = '魔物が全滅した… 敗北';
+  if (game.phase === 'battle') {
+    if (game.heroes.length === 0) {
+      game.phase = 'win';
+      game.round++;
+      game.message = '防衛成功！ ラウンド' + game.round + 'へ';
+    } else if (game.monsters.length === 0) {
+      game.phase = 'over';
+      game.message = '魔物が全滅した… 敗北';
+    }
   }
 }
 // ===END:UPDATE===

@@ -10,10 +10,10 @@
     "RENDER": "render()。地形・魔物・勇者・魔王・パーティクル・HUDの描画。"
   },
   "recent_sections": [
-    "UPDATE",
     "RENDER",
     "ECOSYSTEM",
-    "INIT_INPUT"
+    "INIT_INPUT",
+    "UPDATE"
   ],
   "implemented_features": [
     "[INIT_INPUT] window.addEventListener('keydown', (e) => { if (game.phase === 'dig' && game.dig…",
@@ -29,7 +29,8 @@
     "[UPDATE] update(dt)関数内に、魔王の移動と採掘のクールダウン処理、およびプレイヤーの座標に基づいた採掘可能判定の更新ロジックを統合する。具体的には、game.p…",
     "[RENDER] render()関数内に、採掘可能範囲（プレイヤーの上下左右の壁）を視覚的に強調するハイライト描画を追加する。具体的には、game.player.canDigの…",
     "[ECOSYSTEM] digTile(x, y)関数を実装し、壁を破壊した際に周囲の地面マスを走査してspawnMonster(x, y)を呼び出すロジックを統合する。また、壁破壊時…",
-    "[INIT_INPUT] window.addEventListener('keydown', (e) => { ... })を実装し、WASDキーでgame.playerの座標を更新す…"
+    "[INIT_INPUT] window.addEventListener('keydown', (e) => { ... })を実装し、WASDキーでgame.playerの座標を更新す…",
+    "[UPDATE] update(dt)関数内に、魔王の移動と採掘のクールダウンを管理するタイマー処理を実装する。具体的には、game.playerにlastMoveTimeとla…"
   ],
   "failed_approaches": [
     "[UPDATE] [実行ゲートNG] 起動/実行時にエラー:\nループ実行エラー: Cannot read properties of un…"
