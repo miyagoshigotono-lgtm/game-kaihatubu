@@ -295,7 +295,7 @@ function spawnMonster(x, y) {
   };
   game.monsters.push(monster);
   game.map[x][y].monster = monster;
-  if (typeof addParticle === 'function') addParticle(x, y, '#4a90e2');
+  if (typeof addParticle === 'function') addParticle(x, y, '#4a9022');
 }
 
 function startBattle() {
@@ -308,7 +308,7 @@ function startBattle() {
 }
 
 function onDig(nx, ny) {
-  if (game.digsLeft > 0 && game.map[nx][ny].wall) {
+  if (game.digsLeft > 0 && nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[nx][ny].wall) {
     game.map[nx][ny].wall = false;
     game.digsLeft--;
     spawnMonster(nx, ny);
@@ -325,24 +325,25 @@ function onDig(nx, ny) {
 window.addEventListener('keydown', (e) => {
   if (game.phase !== 'dig') return;
 
-  const mapping = { 
-    'w': [0, -1], 'a': [-1, 0], 's': [0, 1], 'd': [1, 0],
-    'ArrowUp': [0, -1], 'ArrowLeft': [-1, 0], 'ArrowDown': [0, 1], 'ArrowRight': [1, 0] 
-  };
+  const moveMapping = { 'w': [0, -1], 'a': [-1, 0], 's': [0, 1], 'd': [1, 0] };
+  const key = e.key.toLowerCase();
 
-  if (mapping[e.key]) {
-    const [dx, dy] = mapping[e.key];
+  if (moveMapping[key]) {
+    const [dx, dy] = moveMapping[key];
     const nx = game.player.x + dx;
     const ny = game.player.y + dy;
 
-    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
-      if (game.map[nx][ny].wall) {
-        onDig(nx, ny);
-      } else {
-        game.player.x = nx;
-        game.player.y = ny;
-        if (typeof updateUI === 'function') updateUI();
-      }
+    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && !game.map[nx][ny].wall) {
+      game.player.x = nx;
+      game.player.y = ny;
+      if (typeof updateUI === 'function') updateUI();
+    }
+  }
+
+  if (e.code === 'Space') {
+    const directions = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    for (const [dx, dy] of directions) {
+      onDig(game.player.x + dx, game.player.y + dy);
     }
   }
 });
