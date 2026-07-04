@@ -75,7 +75,9 @@ resize();
 const game = {
   round: 1,
   phase: 'dig',
-  digsLeft: 12,
+  maxDigs: 15,
+  digCount: 0,
+  isRoundOver: false,
   player: {
     x: Math.floor(COLS / 2),
     y: Math.floor(ROWS / 2),
@@ -100,15 +102,17 @@ function inBounds(x, y) {
 }
 
 function canDig(x, y) {
-  return inBounds(x, y) && game.map[x][y].wall;
+  return inBounds(x, y) && game.map[x][y].wall && game.digCount < game.maxDigs;
 }
 
 function updateDigAvailability() {
   const p = game.player;
-  p.canDig.up = canDig(p.x, p.y - 1);
-  p.canDig.down = canDig(p.x, p.y + 1);
-  p.canDig.left = canDig(p.x - 1, p.y);
-  p.canDig.right = canDig(p.x + 1, p.y);
+  const canPerformAction = game.phase === 'dig' && !game.isRoundOver;
+  
+  p.canDig.up = canPerformAction && canDig(p.x, p.y - 1);
+  p.canDig.down = canPerformAction && canDig(p.x, p.y + 1);
+  p.canDig.left = canPerformAction && canDig(p.x - 1, p.y);
+  p.canDig.right = canPerformAction && canDig(p.x + 1, p.y);
 }
 
 function isGround(x, y) {

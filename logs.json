@@ -168,5 +168,15 @@
     "task": "render()関数内に、現在のプレイヤー（魔王）が向いている方向を示す『採掘可能方向のインジケーター』を描画するロジックを追加する。具体的には、game.player.canDigの状態に基づき、プレイヤーの周囲4方向に小さな三角形や矢印のアイコンを半透明で描画し、現在どのマスを採掘対象として選択しているかを視覚的に明確化する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-07-05 02:32",
+    "cycle_type": "meeting",
+    "cycle_number": 18,
+    "result": "success",
+    "target_section": "STATE",
+    "task": "gameオブジェクト内に、採掘回数の上限を管理するプロパティ『maxDigs』と、現在の掘削回数を追跡する『digCount』を追加し、プレイヤーの移動と採掘行動がこの制限値に依存するよう状態を拡張する。また、各ラウンド終了条件を判定するための『isRoundOver』フラグを導入する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]
