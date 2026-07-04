@@ -188,5 +188,15 @@
     "task": "キーボードイベントリスナーにスペースキー（または特定のキー）による『採掘アクション』を実装する。具体的には、keydownイベント内で現在のプレイヤーの向き（方向）を保持し、スペースキー押下時にその方向の隣接マスに対して digTile(x, y) を呼び出し、game.digCount をインクリメントする処理を追加する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-07-05 04:46",
+    "cycle_type": "meeting",
+    "cycle_number": 20,
+    "result": "success",
+    "target_section": "ECOSYSTEM",
+    "task": "spawnMonster(x, y, chainChance)関数を完成させる。指定された座標(x, y)の周囲8マスを走査し、空きマスがあれば確率的に魔物を配置する。また、配置時に魔物の種類（type: 0は捕食される側、1は捕食する側）をランダムに決定し、game.monsters配列にオブジェクトをプッシュする処理を実装する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]

@@ -142,132 +142,96 @@ function createMonster(x, y, type) {
     x: x, 
     y: y, 
     type: type, 
-    hp: type === 1 ? 14 : 8, 
-    energy: 40, 
-    cooldown: Math.random() 
+    hp: type === 1 ? 20 : 10, 
+    maxHp: type === 1 ? 20 : 10,
+    energy: 50, 
+    cooldown: Math.random() * 0.5 
   };
+}
+
+function spawnMonster(x, y, chainChance = 0.2) {
+  const neighbors = [];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && !game.map[ny][nx].wall) {
+        neighbors.push({x: nx, y: ny});
+      }
+    }
+  }
+
+  const target = neighbors.length > 0 ? neighbors[(Math.random() * neighbors.length) | 0] : {x, y};
+  const type = Math.random() < 0.3 ? 1 : 0;
+  game.monsters.push(createMonster(target.x, target.y, type));
+  addParticle(target.x, target.y, type === 1 ? '#ff4444' : '#44ff44');
+
+  if (Math.random() < chainChance) {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[ny][nx].wall) {
+        game.map[ny][nx].wall = false;
+        addParticle(nx, ny, '#8B4513');
+        spawnMonster(nx, ny, chainChance * 0.6);
+        break;
+      }
+    }
+  }
 }
 
 function digTile(x, y) {
   if (x < 0 || x >= COLS || y < 0 || y >= ROWS || !game.map[y][x].wall) return;
 
   game.map[y][x].wall = false;
-  
-  // 採掘時の爽快感：土の破片パーティクルを複数生成
-  for (let i = 0; i < 8; i++) {
-    addParticle(x, y, '#8B4513');
-  }
-
-  // 掘削地点から生態系が発生
-  spawnMonster(x, y, 0.3);
+  for (let i = 0; i < 6; i++) addParticle(x, y, '#654321');
+  spawnMonster(x, y, 0.4);
 }
 
-function spawnMonster(x, y, chainChance = 0.2) {
-  const type = Math.random() < 0.35 ? 1 : 0;
-  game.monsters.push(createMonster(x, y, type));
-  
-  // 生態系発生アルゴリズム：土の残滓から��鎖的に魔物が発生
-  if (Math.random() < chainChance) {
-    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (const [dx, dy] of dirs) {
-      const nx = x + dx, ny = y + dy;
-      if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && game.map[ny][nx].wall) {
-        if (Math.random() < 0.4) {
-          game.map[ny][nx].wall = false;
-          addParticle(nx, ny, '#553311');
-          spawnMonster(nx, ny, chainChance * 0.5);
-          break;
+function updateEcosystem(dt) {
+  for (let i = game.monsters.length - 1; i >= 0; i--) {
+    const m = game.monsters[i];
+    m.energy -= dt * (m.type === 1 ? 5 : 2);
+    m.cooldown -= dt;
+
+    if (m.cooldown <= 0) {
+      const opts = groundNeighbors(m.x, m.y);
+      if (opts.length > 0) {
+        const move = opts[(Math.random() * opts.length) | 0];
+        m.x = move[0]; m.y = move[1];
+      }
+      
+      m.cooldown = 0.5 + Math.random() * 0.5;
+
+      if (m.type === 1) {
+        const preyIdx = game.monsters.findIndex(o => o.type === 0 && o.x === m.x && o.y === m.y);
+        if (preyIdx !== -1) {
+          game.monsters.splice(preyIdx, 1);
+          m.energy += 30;
+          addParticle(m.x, m.y, '#ff00ff');
         }
       }
+
+      if (m.energy > 100) {
+        m.energy -= 50;
+        spawnMonster(m.x, m.y, 0.1);
+      }
+    }
+    
+    if (m.energy <= 0 || m.hp <= 0) {
+      game.monsters.splice(i, 1);
     }
   }
 }
 
 function groundNeighbors(x, y) {
   const out = [];
-  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
   for (const [dx, dy] of dirs) {
     const nx = x + dx, ny = y + dy;
     if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && !game.map[ny][nx].wall) out.push([nx, ny]);
   }
   return out;
-}
-
-function nearestHero(x, y) {
-  let best = null, bestD = Infinity;
-  for (const h of game.heroes) {
-    const d = Math.abs(h.x - x) + Math.abs(h.y - y);
-    if (d < bestD) { bestD = d; best = h; }
-  }
-  return { hero: best, dist: bestD };
-}
-
-function updateEcosystem(dt) {
-  for (let i = game.monsters.length - 1; i >= 0; i--) {
-    const m = game.monsters[i];
-    m.energy -= dt * (m.type === 1 ? 3 : 2);
-    m.cooldown -= dt;
-
-    if (m.cooldown <= 0) {
-      const opts = groundNeighbors(m.x, m.y);
-      if (opts.length) { 
-        const p = opts[(Math.random() * opts.length) | 0]; 
-        m.x = p[0]; m.y = p[1]; 
-      }
-      m.cooldown = 0.6 + Math.random() * 0.4;
-
-      if (m.type === 1) {
-        const prey = game.monsters.find(o => o.type === 0 && o.x === m.x && o.y === m.y);
-        if (prey) { prey.hp -= 8; m.energy += 20; addParticle(m.x, m.y, '#ff44ff'); }
-      }
-      
-      const nh = nearestHero(m.x, m.y);
-      if (nh.hero && nh.dist <= 1) { 
-        nh.hero.hp -= 2; 
-        addParticle(nh.hero.x, nh.hero.y, '#ff6b6b'); 
-      }
-
-      if (m.energy > 80) {
-        m.energy -= 40;
-        spawnMonster(m.x, m.y, 0);
-        addParticle(m.x, m.y, '#00ff88');
-      }
-    }
-    if (m.energy <= 0 || m.hp <= 0) game.monsters.splice(i, 1);
-  }
-}
-
-function spawnHeroes(n) {
-  for (let i = 0; i < n; i++) {
-    let y = (Math.random() * ROWS) | 0;
-    if (game.map[y][0].wall) game.map[y][0].wall = false;
-    game.heroes.push({ x: 0, y: y, hp: 30 + game.round * 10, cooldown: 0 });
-  }
-}
-
-function updateHeroes(dt) {
-  for (let i = game.heroes.length - 1; i >= 0; i--) {
-    const h = game.heroes[i];
-    h.cooldown -= dt;
-    if (h.cooldown <= 0) {
-      const target = game.monsters.reduce((prev, curr) => {
-        const d = Math.abs(curr.x - h.x) + Math.abs(curr.y - h.y);
-        return (d < prev.d) ? {m: curr, d: d} : prev;
-      }, {m: null, d: Infinity}).m;
-
-      if (target) {
-        const dx = Math.sign(target.x - h.x), dy = Math.sign(target.y - h.y);
-        if (Math.abs(target.x - h.x) + Math.abs(target.y - h.y) <= 1) {
-          target.hp -= 10; addParticle(target.x, target.y, '#ffd23f');
-        } else if (Math.random() > 0.3) {
-          if (dx !== 0 && !game.map[h.y][h.x + dx].wall) h.x += dx;
-          else if (dy !== 0 && !game.map[h.y + dy][h.x].wall) h.y += dy;
-        }
-      }
-      h.cooldown = 0.8;
-    }
-    if (h.hp <= 0) { addParticle(h.x, h.y, '#ffffff'); game.heroes.splice(i, 1); }
-  }
 }
 // ===END:ECOSYSTEM===
 
