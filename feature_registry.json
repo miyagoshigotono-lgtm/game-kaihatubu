@@ -10,10 +10,10 @@
     "RENDER": "render()。地形・魔物・勇者・魔王・パーティクル・HUDの描画。"
   },
   "recent_sections": [
-    "INIT_INPUT",
     "UPDATE",
     "RENDER",
-    "STATE"
+    "STATE",
+    "INIT_INPUT"
   ],
   "implemented_features": [
     "[INIT_INPUT] window.addEventListener('keydown', (e) => { if (game.phase === 'dig' && game.dig…",
@@ -32,7 +32,8 @@
     "[INIT_INPUT] window.addEventListener('keydown', (e) => { ... })を実装し、WASDキーでgame.playerの座標を更新す…",
     "[UPDATE] update(dt)関数内に、魔王の移動と採掘のクールダウンを管理するタイマー処理を実装する。具体的には、game.playerにlastMoveTimeとla…",
     "[RENDER] render()関数内に、現在のプレイヤー（魔王）が向いている方向を示す『採掘可能方向のインジケーター』を描画するロジックを追加する。具体的には、game.pl…",
-    "[STATE] gameオブジェクト内に、採掘回数の上限を管理するプロパティ『maxDigs』と、現在の掘削回数を追跡する『digCount』を追加し、プレイヤーの移動と採掘行…"
+    "[STATE] gameオブジェクト内に、採掘回数の上限を管理するプロパティ『maxDigs』と、現在の掘削回数を追跡する『digCount』を追加し、プレイヤーの移動と採掘行…",
+    "[INIT_INPUT] キーボードイベントリスナーにスペースキー（または特定のキー）による『採掘アクション』を実装する。具体的には、keydownイベント内で現在のプレイヤーの向き（方…"
   ],
   "failed_approaches": [
     "[UPDATE] [実行ゲートNG] 起動/実行時にエラー:\nループ実行エラー: Cannot read properties of un…"

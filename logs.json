@@ -178,5 +178,15 @@
     "task": "gameオブジェクト内に、採掘回数の上限を管理するプロパティ『maxDigs』と、現在の掘削回数を追跡する『digCount』を追加し、プレイヤーの移動と採掘行動がこの制限値に依存するよう状態を拡張する。また、各ラウンド終了条件を判定するための『isRoundOver』フラグを導入する。",
     "qa_note": "PASS（AI-QA＋静的検証）",
     "retry_count": 0
+  },
+  {
+    "timestamp": "2026-07-05 03:29",
+    "cycle_type": "meeting",
+    "cycle_number": 19,
+    "result": "success",
+    "target_section": "INIT_INPUT",
+    "task": "キーボードイベントリスナーにスペースキー（または特定のキー）による『採掘アクション』を実装する。具体的には、keydownイベント内で現在のプレイヤーの向き（方向）を保持し、スペースキー押下時にその方向の隣接マスに対して digTile(x, y) を呼び出し、game.digCount をインクリメントする処理を追加する。",
+    "qa_note": "PASS（AI-QA＋静的検証）",
+    "retry_count": 0
   }
 ]
