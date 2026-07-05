@@ -23,7 +23,7 @@
           "id": "p1t3",
           "section": "RENDER",
           "title": "掘った跡（地面）と未採掘の壁の見た目の差をはっきりさせ、迷宮らしさを出す",
-          "done": false
+          "done": true
         },
         {
           "id": "p1t4",
