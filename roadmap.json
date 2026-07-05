@@ -7,10 +7,30 @@
       "title": "操作と採掘の手ざわり",
       "goal": "魔王を動かして壁を掘るのが『気持ちいい』と感じられる状態にする。",
       "tasks": [
-        { "id": "p1t1", "section": "RENDER", "title": "採掘できる方向のハイライトを、脈動やアイコンでもっと分かりやすく目立たせる", "done": false },
-        { "id": "p1t2", "section": "INIT_INPUT", "title": "掘った瞬間に手応えが出るよう、魔王が少し弾む/画面が軽く揺れる等の反応を追加する", "done": false },
-        { "id": "p1t3", "section": "RENDER", "title": "掘った跡（地面）と未採掘の壁の見た目の差をはっきりさせ、迷宮らしさを出す", "done": false },
-        { "id": "p1t4", "section": "STATE", "title": "採掘の連鎖数（コンボ）を数える状態を追加し、HUDに表示できるようにする", "done": false }
+        {
+          "id": "p1t1",
+          "section": "RENDER",
+          "title": "採掘できる方向のハイライトを、脈動やアイコンでもっと分かりやすく目立たせる",
+          "done": true
+        },
+        {
+          "id": "p1t2",
+          "section": "INIT_INPUT",
+          "title": "掘った瞬間に手応えが出るよう、魔王が少し弾む/画面が軽く揺れる等の反応を追加する",
+          "done": false
+        },
+        {
+          "id": "p1t3",
+          "section": "RENDER",
+          "title": "掘った跡（地面）と未採掘の壁の見た目の差をはっきりさせ、迷宮らしさを出す",
+          "done": false
+        },
+        {
+          "id": "p1t4",
+          "section": "STATE",
+          "title": "採掘の連鎖数（コンボ）を数える状態を追加し、HUDに表示できるようにする",
+          "done": false
+        }
       ]
     },
     {
@@ -18,10 +38,30 @@
       "title": "魔物に個性を",
       "goal": "湧いてくる魔物が、見た目でも動きでも『それぞれ違う生き物』に見えるようにする。",
       "tasks": [
-        { "id": "p2t1", "section": "ECOSYSTEM", "title": "魔物に複数の種族（例：草食2種・肉食2種）を導入し、種ごとに速度や繁殖力を変える", "done": false },
-        { "id": "p2t2", "section": "RENDER", "title": "魔物の種族ごとに形・色・サイズを変え、一目で見分けられるようにする", "done": false },
-        { "id": "p2t3", "section": "ECOSYSTEM", "title": "空腹・満腹などの状態を持たせ、状態で少し行動が変わるようにする", "done": false },
-        { "id": "p2t4", "section": "RENDER", "title": "捕食・繁殖の瞬間に専用のエフェクトを出して、生態系の営みを見えるようにする", "done": false }
+        {
+          "id": "p2t1",
+          "section": "ECOSYSTEM",
+          "title": "魔物に複数の種族（例：草食2種・肉食2種）を導入し、種ごとに速度や繁殖力を変える",
+          "done": false
+        },
+        {
+          "id": "p2t2",
+          "section": "RENDER",
+          "title": "魔物の種族ごとに形・色・サイズを変え、一目で見分けられるようにする",
+          "done": false
+        },
+        {
+          "id": "p2t3",
+          "section": "ECOSYSTEM",
+          "title": "空腹・満腹などの状態を持たせ、状態で少し行動が変わるようにする",
+          "done": false
+        },
+        {
+          "id": "p2t4",
+          "section": "RENDER",
+          "title": "捕食・繁殖の瞬間に専用のエフェクトを出して、生態系の営みを見えるようにする",
+          "done": false
+        }
       ]
     },
     {
@@ -29,9 +69,24 @@
       "title": "勇者との駆け引き",
       "goal": "勇者の侵攻が『ただ来て終わる』ではなく、手に汗握る攻防になるようにする。",
       "tasks": [
-        { "id": "p3t1", "section": "ECOSYSTEM", "title": "勇者に職業（戦士/魔法使い等）を持たせ、動きや強さに違いを出す", "done": false },
-        { "id": "p3t2", "section": "RENDER", "title": "勇者のHPバーや、攻撃・被弾のエフェクトを描いて戦況を見えるようにする", "done": false },
-        { "id": "p3t3", "section": "UPDATE", "title": "魔物の数や種類に応じて勇者の侵攻が変化するようにし、防衛の戦略性を出す", "done": false }
+        {
+          "id": "p3t1",
+          "section": "ECOSYSTEM",
+          "title": "勇者に職業（戦士/魔法使い等）を持たせ、動きや強さに違いを出す",
+          "done": false
+        },
+        {
+          "id": "p3t2",
+          "section": "RENDER",
+          "title": "勇者のHPバーや、攻撃・被弾のエフェクトを描いて戦況を見えるようにする",
+          "done": false
+        },
+        {
+          "id": "p3t3",
+          "section": "UPDATE",
+          "title": "魔物の数や種類に応じて勇者の侵攻が変化するようにし、防衛の戦略性を出す",
+          "done": false
+        }
       ]
     },
     {
@@ -39,9 +94,24 @@
       "title": "遊びの深み",
       "goal": "ラウンドを重ねるほど育つ実感と、次も遊びたくなる要素を足す。",
       "tasks": [
-        { "id": "p4t1", "section": "STATE", "title": "ラウンドをまたいで受け継がれる成長要素（スコアや強化）を追加する", "done": false },
-        { "id": "p4t2", "section": "RENDER", "title": "勝利・敗北の演出をドラマチックにし、次への意欲が湧くようにする", "done": false },
-        { "id": "p4t3", "section": "INIT_INPUT", "title": "魔王の間接干渉（環境フィルター設置など）を1つ追加し、戦術の幅を広げる", "done": false }
+        {
+          "id": "p4t1",
+          "section": "STATE",
+          "title": "ラウンドをまたいで受け継がれる成長要素（スコアや強化）を追加する",
+          "done": false
+        },
+        {
+          "id": "p4t2",
+          "section": "RENDER",
+          "title": "勝利・敗北の演出をドラマチックにし、次への意欲が湧くようにする",
+          "done": false
+        },
+        {
+          "id": "p4t3",
+          "section": "INIT_INPUT",
+          "title": "魔王の間接干渉（環境フィルター設置など）を1つ追加し、戦術の幅を広げる",
+          "done": false
+        }
       ]
     }
   ]

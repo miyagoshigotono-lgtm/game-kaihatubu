@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "timestamp": "2026-07-06 02:35",
+    "cycle_type": "meeting",
+    "cycle_number": 1,
+    "result": "success",
+    "target_section": "RENDER",
+    "task": "採掘できる方向のハイライトを、脈動やアイコンでもっと分かりやすく目立たせる",
+    "phase_id": 1,
+    "phase_title": "操作と採掘の手ざわり",
+    "task_id": "p1t1",
+    "qa_note": "PASS（AI-QA＋静的検証＋行動ゲート）",
+    "retry_count": 0
+  }
+]

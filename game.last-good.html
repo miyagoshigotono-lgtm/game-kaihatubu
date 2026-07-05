@@ -270,10 +270,15 @@ function update(dt) {
 // ===END:UPDATE===
 
 // ===SECTION:RENDER===
-// Canvas描画。地形・採掘インジケータ・魔物・勇者・魔王・パーティクル・HUD。
 function render() {
   const W = COLS * TILE, H = ROWS * TILE;
-  ctx.clearRect(0, 0, W, H + HUD);
+  const skyHeight = TILE * 2;
+  
+  // 背景描画
+  ctx.fillStyle = '#87CEEB'; // スカイブルー
+  ctx.fillRect(0, 0, W, skyHeight);
+  ctx.fillStyle = '#4B3621'; // 地面
+  ctx.fillRect(0, skyHeight, W, H + HUD - skyHeight);
 
   // 地形
   for (let x = 0; x < COLS; x++) {
@@ -281,10 +286,10 @@ function render() {
       const c = game.map[x] && game.map[x][y];
       if (!c) continue;
       if (c.wall) {
-        ctx.fillStyle = COLORS.wall;
+        ctx.fillStyle = y < 2 ? '#5a4530' : COLORS.wall;
         ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-        ctx.fillStyle = COLORS.wallEdge;
-        ctx.fillRect(x * TILE, y * TILE, TILE - 1, 3);
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.strokeRect(x * TILE, y * TILE, TILE, TILE);
       } else {
         ctx.fillStyle = COLORS.ground;
         ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
@@ -292,55 +297,67 @@ function render() {
     }
   }
 
-  // 採掘可能方向のインジケータ（隣接する壁を掘れる時にハイライト）
+  // 採掘可能方向のハイライト（脈動するアイコンと枠）
   if (game.phase === 'dig' && game.digsLeft > 0) {
     const p = game.player;
     const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
-    ctx.strokeStyle = COLORS.player + 'aa';
-    ctx.lineWidth = 2;
+    const pulse = Math.abs(Math.sin(Date.now() / 200));
+    
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(255, 255, 0, ${0.5 + pulse * 0.5})`;
+    
     for (const [dx, dy] of dirs) {
       const tx = p.x + dx, ty = p.y + dy;
-      if (isWall(tx, ty)) ctx.strokeRect(tx * TILE + 3, ty * TILE + 3, TILE - 6, TILE - 6);
+      if (isWall(tx, ty)) {
+        const x = tx * TILE, y = ty * TILE;
+        ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 8);
+        
+        // 採掘アイコン（つるはし）
+        ctx.fillStyle = 'white';
+        ctx.font = '20px Arial';
+        ctx.fillText('⛏', x + TILE/2 - 8, y + TILE/2 + 7);
+      }
     }
   }
 
-  // 魔物（肉食＝三角 / 草食＝丸）
+  // 魔物
   for (const m of game.monsters) {
     const cx = m.x * TILE + TILE / 2, cy = m.y * TILE + TILE / 2;
     ctx.fillStyle = m.type === 1 ? COLORS.predator : COLORS.prey;
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = 'black';
     ctx.beginPath();
     if (m.type === 1) {
-      ctx.moveTo(cx, cy - TILE * 0.32);
-      ctx.lineTo(cx + TILE * 0.32, cy + TILE * 0.30);
-      ctx.lineTo(cx - TILE * 0.32, cy + TILE * 0.30);
-      ctx.closePath();
+      ctx.moveTo(cx, cy - TILE * 0.35);
+      ctx.lineTo(cx + TILE * 0.35, cy + TILE * 0.35);
+      ctx.lineTo(cx - TILE * 0.35, cy + TILE * 0.35);
     } else {
-      ctx.arc(cx, cy, TILE * 0.28, 0, Math.PI * 2);
+      ctx.arc(cx, cy, TILE * 0.25, 0, Math.PI * 2);
     }
     ctx.fill();
+    ctx.shadowBlur = 0;
   }
 
   // 勇者
   for (const h of game.heroes) {
     ctx.fillStyle = COLORS.hero;
-    ctx.fillRect(h.x * TILE + TILE * 0.22, h.y * TILE + TILE * 0.16, TILE * 0.56, TILE * 0.68);
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(h.x * TILE + TILE * 0.32, h.y * TILE + TILE * 0.26, TILE * 0.1, TILE * 0.1);
+    ctx.fillRect(h.x * TILE + TILE * 0.2, h.y * TILE + TILE * 0.1, TILE * 0.6, TILE * 0.8);
+    ctx.fillStyle = '#FFD700'; // 勇者の頭
+    ctx.fillRect(h.x * TILE + TILE * 0.35, h.y * TILE + TILE * 0.15, TILE * 0.3, TILE * 0.2);
   }
 
-  // 魔王（プレイヤー）：脈動して光るひし形
+  // 魔王
   const px = game.player.x * TILE, py = game.player.y * TILE;
-  const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
+  const pulse = (Math.sin(Date.now() / 200) + 1) / 2;
   ctx.save();
-  ctx.shadowColor = COLORS.player;
-  ctx.shadowBlur = 8 + pulse * 14;
+  ctx.shadowColor = '#fff';
+  ctx.shadowBlur = 10 + pulse * 15;
   ctx.fillStyle = COLORS.player;
   ctx.beginPath();
-  ctx.moveTo(px + TILE / 2, py + TILE * 0.10);
-  ctx.lineTo(px + TILE * 0.90, py + TILE / 2);
-  ctx.lineTo(px + TILE / 2, py + TILE * 0.90);
-  ctx.lineTo(px + TILE * 0.10, py + TILE / 2);
-  ctx.closePath();
+  ctx.moveTo(px + TILE/2, py + TILE * 0.1);
+  ctx.lineTo(px + TILE * 0.9, py + TILE/2);
+  ctx.lineTo(px + TILE/2, py + TILE * 0.9);
+  ctx.lineTo(px + TILE * 0.1, py + TILE/2);
   ctx.fill();
   ctx.restore();
 
@@ -349,22 +366,20 @@ function render() {
     ctx.globalAlpha = Math.max(0, p.life);
     ctx.fillStyle = p.color;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 
   // HUD
-  ctx.fillStyle = COLORS.hud;
+  ctx.fillStyle = 'rgba(0,0,0,0.8)';
   ctx.fillRect(0, H, W, HUD);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 15px "Courier New", monospace';
-  ctx.fillText('ROUND ' + game.round + '   掘削 ' + game.digsLeft, 14, H + 27);
-  ctx.fillStyle = '#c9b8e8';
-  ctx.font = '12px "Courier New", monospace';
-  ctx.fillText('魔物 ' + game.monsters.length + '  /  勇者 ' + game.heroes.length, 14, H + 48);
-  ctx.fillStyle = '#8a7fa8';
-  ctx.fillText(game.message || '', 200, H + 27);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText(`ROUND: ${game.round} | 掘削回数: ${game.digsLeft}`, 20, H + 30);
+  ctx.fillStyle = '#aaa';
+  ctx.font = '12px monospace';
+  ctx.fillText(`魔��: ${game.monsters.length}  勇者: ${game.heroes.length}`, 20, H + 50);
 }
 // ===END:RENDER===
 
