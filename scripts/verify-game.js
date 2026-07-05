@@ -45,10 +45,23 @@ function makeAny() {
   return any;
 }
 
+// 同名の関数宣言が複数ないか（後の定義が静かに前を上書きし、意味崩壊を起こす）
+function findDuplicateFunctions(code) {
+  const counts = {};
+  const re = /(?:^|\n)\s*function\s+([A-Za-z_$][\w$]*)\s*\(/g;
+  let m;
+  while ((m = re.exec(code))) { counts[m[1]] = (counts[m[1]] || 0) + 1; }
+  return Object.keys(counts).filter(k => counts[k] > 1);
+}
+
 function verifyGameHtml(html) {
   const errors = [];
   const code = extractScript(html);
   if (!code || code.length < 50) return { ok: false, errors: ['<script> が見つからない/短すぎる'] };
+
+  // 静的：関数の二重定義を禁止（今回の生態系崩壊の主犯）
+  const dups = findDuplicateFunctions(code);
+  if (dups.length) return { ok: false, errors: ['関数が二重定義されています（後の定義が前を上書きし挙動が壊れます）: ' + dups.join(', ')] };
 
   const any = makeAny();
   const listeners = {};
@@ -97,8 +110,10 @@ function verifyGameHtml(html) {
   const context = vm.createContext(sandbox);
 
   // 1) スクリプトのトップレベル実行（ここで構文/未定義/二重宣言が落ちる）
+  //    実行後に game 状態を検査できるよう、末尾で globalThis に露出させる。
+  const probedCode = code + '\n;try{ globalThis.__gs = (typeof game !== "undefined") ? game : null; }catch(e){ globalThis.__gs = null; }';
   try {
-    vm.runInContext(code, context, { timeout: 5000, filename: 'game.html' });
+    vm.runInContext(probedCode, context, { timeout: 5000, filename: 'game.html' });
   } catch (e) {
     return { ok: false, errors: ['起動時エラー: ' + (e && e.message ? e.message : String(e))] };
   }
@@ -128,10 +143,35 @@ function verifyGameHtml(html) {
   }
 
   if (!tick(5)) return { ok: false, errors };
-  // 採掘→移動→戦闘までを一通り叩く（dで掘り進め、合間に上下移動）
-  const seq = 'dddsdwddsaddwdsddddsddddwdd'.split('');
+  // 採掘→移動を叩いて魔物を湧かせる（この時点で生態系が動き出す）
+  const seq = 'dddsdwddsaddwds'.split('');
   if (!fireKeys(seq)) return { ok: false, errors };
-  if (!tick(40)) return { ok: false, errors };          // 戦闘フェーズの生態系/勇者AIを回す
+
+  // --- 行動ゲート：ゲームが「生きている」かを検査 ---
+  const gs = sandbox.__gs;
+  function coord(v) { return typeof v === 'number' && isFinite(v); }
+  if (gs && gs.monsters && gs.monsters.length) {
+    // NaN混入チェック（座標・エネルギーが壊れていないか）
+    for (const m of gs.monsters) {
+      if (!coord(m.x) || !coord(m.y)) { errors.push('魔物の座標がNaN/不正（生態系が壊れています）'); break; }
+    }
+    if (gs.player && (!coord(gs.player.x) || !coord(gs.player.y))) errors.push('プレイヤー座標がNaN/不正');
+
+    // 生態系が動いているか：魔物の配置を記録して150フレーム回し、変化があるか
+    const before = gs.monsters.map(m => m.id + ':' + m.x + ',' + m.y).join('|');
+    const cntBefore = gs.monsters.length;
+    if (!tick(150)) return { ok: false, errors };
+    const after = (sandbox.__gs.monsters || []).map(m => m.id + ':' + m.x + ',' + m.y).join('|');
+    const cntAfter = (sandbox.__gs.monsters || []).length;
+    if (cntBefore > 0 && before === after && cntBefore === cntAfter) {
+      errors.push('生態系が凍結（魔物が一切動かず・増減もしない）。ecosystemが呼ばれていないか、魔物にenergy/cooldownが無い可能性。');
+    }
+  } else {
+    // 魔物が湧かない＝採掘で魔物生成が機能していない
+    errors.push('採掘しても魔物が1体も生まれない（spawnMonster/採掘連携が壊れています）。');
+  }
+
+  if (!tick(40)) return { ok: false, errors };
 
   return { ok: errors.length === 0, errors };
 }

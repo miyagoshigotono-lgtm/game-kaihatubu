@@ -58,11 +58,12 @@
 
     <!-- ROOM NAV -->
     <div style="max-width:900px;margin:0 auto;padding:0 18px 12px;">
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
-        <button class="nav-btn" data-room="game"    onclick="showRoom('game')"><span style="font-size:1.35rem;line-height:1;">🎮</span><span style="font-size:.74rem;font-weight:800;">ゲーム</span></button>
-        <button class="nav-btn" data-room="meeting" onclick="showRoom('meeting')"><span style="font-size:1.35rem;line-height:1;">🗣</span><span style="font-size:.74rem;font-weight:800;">会議室</span></button>
-        <button class="nav-btn" data-room="office"  onclick="showRoom('office')"><span style="font-size:1.35rem;line-height:1;">☕</span><span style="font-size:.74rem;font-weight:800;">オフィス</span></button>
-        <button class="nav-btn" data-room="desk"    onclick="showRoom('desk')"><span style="font-size:1.35rem;line-height:1;">📝</span><span style="font-size:.74rem;font-weight:800;">社長デスク</span></button>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px;">
+        <button class="nav-btn" data-room="game"    onclick="showRoom('game')"><span style="font-size:1.3rem;line-height:1;">🎮</span><span style="font-size:.7rem;font-weight:800;">ゲーム</span></button>
+        <button class="nav-btn" data-room="meeting" onclick="showRoom('meeting')"><span style="font-size:1.3rem;line-height:1;">🗣</span><span style="font-size:.7rem;font-weight:800;">会議室</span></button>
+        <button class="nav-btn" data-room="office"  onclick="showRoom('office')"><span style="font-size:1.3rem;line-height:1;">☕</span><span style="font-size:.7rem;font-weight:800;">オフィス</span></button>
+        <button class="nav-btn" data-room="album"   onclick="showRoom('album')"><span style="font-size:1.3rem;line-height:1;">📸</span><span style="font-size:.7rem;font-weight:800;">成長記録</span></button>
+        <button class="nav-btn" data-room="desk"    onclick="showRoom('desk')"><span style="font-size:1.3rem;line-height:1;">📝</span><span style="font-size:.7rem;font-weight:800;">社長デスク</span></button>
       </div>
     </div>
   </header>
@@ -85,12 +86,24 @@
     <!-- ===== MEETING ===== -->
     <section id="room-meeting" class="room">
       <div class="sec-head"><b>🗣 会議室</b><span id="meetingHint">きょうの開発会議</span></div>
-      <div style="display:flex;align-items:center;gap:10px;background:#fffdf8;border:3px solid #2b2b3a;border-radius:16px;padding:11px 16px;box-shadow:0 4px 0 rgba(43,43,58,.12);margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:10px;background:#fffdf8;border:3px solid #2b2b3a;border-radius:16px;padding:11px 16px;box-shadow:0 4px 0 rgba(43,43,58,.12);margin-bottom:12px;">
         <span style="font-size:1.4rem;">📋</span>
         <div>
           <div style="font-size:.66rem;font-weight:800;letter-spacing:.1em;color:#c79a4e;">きょうの議題</div>
           <div id="agendaText" style="font-size:.95rem;font-weight:800;">読み込み中…</div>
         </div>
+      </div>
+
+      <!-- ロードマップ進捗 -->
+      <div style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:16px;padding:12px 16px;box-shadow:0 4px 0 rgba(43,43,58,.12);margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <span style="font-size:.82rem;font-weight:800;">🗺 開発ロードマップ</span>
+          <span id="roadmapPhase" style="font-size:.72rem;font-weight:700;color:#9a8f7e;">読み込み中…</span>
+        </div>
+        <div style="height:12px;background:#f0e6d4;border:2px solid #2b2b3a;border-radius:999px;overflow:hidden;">
+          <div id="roadmapBar" style="height:100%;width:0%;background:linear-gradient(90deg,#ff8a3d,#ffcb2b);transition:width .5s;"></div>
+        </div>
+        <div id="roadmapGoal" style="font-size:.74rem;font-weight:500;color:#7a6f58;margin-top:7px;"></div>
       </div>
       <div style="position:relative;background:linear-gradient(180deg,#cfe8ff 0%,#e7f4ff 52%,#d8c4a0 52%,#c9b08a 100%);border:3px solid #2b2b3a;border-radius:22px;box-shadow:0 6px 0 rgba(43,43,58,.15);overflow:hidden;">
         <div style="position:relative;width:100%;height:0;padding-bottom:52%;min-height:300px;">
@@ -135,6 +148,31 @@
         <button class="btn-pop" style="background:#ffcb2b;" onclick="openTreatPicker()">🍡 差し入れする</button>
       </div>
       <div class="status-line" id="officeStatus"></div>
+    </section>
+
+    <!-- ===== ALBUM ===== -->
+    <section id="room-album" class="room">
+      <div class="sec-head"><b>📸 成長記録</b><span>毎晩の開発でゲームがどう育ったか</span></div>
+
+      <!-- 昨日 vs 今日（最初と最新） -->
+      <div id="albumCompare" style="display:none;background:#fffdf8;border:3px solid #2b2b3a;border-radius:18px;padding:14px;box-shadow:0 6px 0 rgba(43,43,58,.15);margin-bottom:16px;">
+        <div style="font-size:.82rem;font-weight:800;margin-bottom:10px;">✨ スタート → いま</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="text-align:center;">
+            <img id="albumFirst" style="width:100%;border:2px solid #2b2b3a;border-radius:10px;display:block;" alt="スタート">
+            <div id="albumFirstCap" style="font-size:.68rem;font-weight:700;color:#9a8f7e;margin-top:5px;"></div>
+          </div>
+          <div style="text-align:center;">
+            <img id="albumLast" style="width:100%;border:2px solid #2b2b3a;border-radius:10px;display:block;" alt="いま">
+            <div id="albumLastCap" style="font-size:.68rem;font-weight:700;color:#9a8f7e;margin-top:5px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:.8rem;font-weight:800;color:#7a6f58;margin-bottom:10px;">🎞 これまでの記録</div>
+      <div id="albumList" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="text-align:center;color:#b3a890;font-weight:500;padding:20px;">読み込み中…</div>
+      </div>
     </section>
 
     <!-- ===== DESK ===== -->
@@ -597,13 +635,65 @@
     if(TRANSCRIPT && TRANSCRIPT.agenda){ agenda.textContent = TRANSCRIPT.agenda; }
     else if(LATEST){
       const sec = SECTION_JP[LATEST.target_section] || LATEST.target_section || '';
-      agenda.textContent = sec ? `「${sec}」まわりの改善` : (LATEST.task||'開発を進める').slice(0,40);
+      agenda.textContent = LATEST.task ? String(LATEST.task).slice(0,50) : (sec ? `「${sec}」まわりの改善` : '開発を進める');
       document.getElementById('meetingHint').textContent = `最新：${fmtTime(LATEST.timestamp)} の会議`;
     } else { agenda.textContent = 'まだ会議は開かれていません'; }
+
+    await renderRoadmap();
+    await renderAlbum();
 
     // デフォルト表示は会議室
     showRoom('meeting');
   })();
+
+  // ===== ロードマップ進捗 =====
+  async function renderRoadmap(){
+    const phaseEl=document.getElementById('roadmapPhase');
+    const barEl=document.getElementById('roadmapBar');
+    const goalEl=document.getElementById('roadmapGoal');
+    let rm; try{ rm=await fetchJson('roadmap.json'); }catch(e){ phaseEl.textContent='未設定'; return; }
+    if(!rm || !Array.isArray(rm.phases)){ phaseEl.textContent='未設定'; return; }
+    const totalPhases=rm.phases.length;
+    const cur=rm.phases.find(p=>p.id===rm.current_phase) || rm.phases[0];
+    const doneTasks=(cur.tasks||[]).filter(t=>t.done).length;
+    const totalTasks=(cur.tasks||[]).length||1;
+    const pct=Math.round(doneTasks/totalTasks*100);
+    phaseEl.textContent=`フェーズ ${cur.id}/${totalPhases}：${cur.title}（${doneTasks}/${totalTasks}）`;
+    barEl.style.width=pct+'%';
+    goalEl.textContent='🎯 '+(cur.goal||'');
+  }
+
+  // ===== 成長アルバム =====
+  async function renderAlbum(){
+    const list=document.getElementById('albumList');
+    let idx; try{ idx=await fetchJson('screenshots/index.json'); }catch(e){ idx=null; }
+    if(!Array.isArray(idx) || !idx.length){
+      list.innerHTML='<div style="text-align:center;color:#b3a890;font-weight:500;padding:20px;">まだ記録がありません。夜の開発が進むと、毎晩のゲーム画面がここに増えていきます。</div>';
+      return;
+    }
+    // 比較（最初と最新）
+    if(idx.length>=2){
+      const first=idx[0], last=idx[idx.length-1];
+      document.getElementById('albumCompare').style.display='block';
+      document.getElementById('albumFirst').src='screenshots/'+first.file+'?t='+Date.now();
+      document.getElementById('albumLast').src='screenshots/'+last.file+'?t='+Date.now();
+      document.getElementById('albumFirstCap').textContent=`スタート（${esc(first.date||'')}）`;
+      document.getElementById('albumLastCap').textContent=`いま（${esc(last.date||'')}）`;
+    }
+    // 一覧（新しい順）
+    const sorted=idx.slice().reverse();
+    list.innerHTML=sorted.map(s=>`
+      <div style="background:#fffdf8;border:3px solid #2b2b3a;border-radius:14px;overflow:hidden;box-shadow:0 4px 0 rgba(43,43,58,.12);">
+        <img src="screenshots/${esc(s.file)}?t=${Date.now()}" style="width:100%;display:block;border-bottom:2px solid #2b2b3a;" alt="記録${esc(String(s.n))}">
+        <div style="padding:10px 13px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            ${s.phase?`<span style="font-size:.68rem;font-weight:800;padding:2px 9px;border-radius:999px;border:2px solid #2b2b3a;background:#ffe2c4;">フェーズ${esc(String(s.phase))}</span>`:''}
+            <span style="font-size:.72rem;color:#b3a890;font-weight:700;">${esc(s.date||'')}</span>
+          </div>
+          <div style="font-size:.8rem;font-weight:600;color:#5a5468;line-height:1.5;margin-top:5px;">${esc(s.task||'')}</div>
+        </div>
+      </div>`).join('');
+  }
 
   function reloadGame(){ const f=document.getElementById('gameFrame'); f.src=f.src; }
 </script>
