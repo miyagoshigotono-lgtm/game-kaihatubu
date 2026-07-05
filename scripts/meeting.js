@@ -276,6 +276,57 @@ ${logsText}
 }
 
 // ============================================================
+// ロードマップ駆動の選定（ランダムをやめ、地図の上を一歩ずつ進む）
+// ============================================================
+function pickRoadmapTask(roadmap) {
+  if (!roadmap || !Array.isArray(roadmap.phases)) return null;
+  let startIdx = roadmap.phases.findIndex(p => p.id === roadmap.current_phase);
+  if (startIdx === -1) startIdx = 0;
+  for (let i = startIdx; i < roadmap.phases.length; i++) {
+    const phase = roadmap.phases[i];
+    const task = (phase.tasks || []).find(t => !t.done);
+    if (task) return { phase, task };
+  }
+  return null; // 全フェーズ完了
+}
+
+function buildSelection(roadmap, recentInstructions) {
+  const instr = (recentInstructions && recentInstructions.length)
+    ? `\n\n【社長からの最近の指示（可能なら汲むこと）】\n${recentInstructions.map(s => '- ' + s).join('\n')}` : '';
+  const picked = pickRoadmapTask(roadmap);
+  if (!picked) {
+    return {
+      target_section: 'RENDER',
+      specific_task: 'ゲーム全体の完成度を上げる。演出・見やすさ・気持ちよさをさらに磨く。' + instr,
+      reason: '全フェーズ完了。磨き込みフェーズ。',
+      task_id: null, task_title: 'ゲーム全体の磨き込み', phase_id: roadmap ? roadmap.current_phase : 0, phase_title: '磨き込み'
+    };
+  }
+  const { phase, task } = picked;
+  return {
+    target_section: task.section,
+    specific_task: `${task.title}\n\n【このフェーズの目標】${phase.goal}${instr}`,
+    reason: `ロードマップ フェーズ${phase.id}「${phase.title}」を推進。`,
+    task_id: task.id, task_title: task.title, phase_id: phase.id, phase_title: phase.title
+  };
+}
+
+// タスク完了を反映し、現在フェーズが全て終われば次フェーズへ進める
+function markRoadmapDone(roadmap, taskId) {
+  if (!roadmap || !taskId || !Array.isArray(roadmap.phases)) return roadmap;
+  for (const phase of roadmap.phases) {
+    const t = (phase.tasks || []).find(x => x.id === taskId);
+    if (t) { t.done = true; break; }
+  }
+  const cur = roadmap.phases.find(p => p.id === roadmap.current_phase);
+  if (cur && (cur.tasks || []).length && cur.tasks.every(t => t.done)) {
+    const next = roadmap.phases.find(p => p.id === roadmap.current_phase + 1);
+    if (next) roadmap.current_phase = next.id;
+  }
+  return roadmap;
+}
+
+// ============================================================
 // 生成→スプライス→QA（1サイクル分）
 // ============================================================
 async function generateAndReview(targetSection, specificTask, gameHtml, registry, userIntent, rejectReason) {
@@ -396,11 +447,15 @@ async function main() {
 
   console.log(`[${CYCLE_TYPE}] 開始。user_intent: ${truncate(userIntent, 80)}`);
 
-  // セクション選定
-  const selection = await selectSection(gameHtml, registry, userIntent, logs);
+  // セクション選定：ロードマップの「現在フェーズの、まだ終わっていない最初のタスク」を推進する
+  const roadmap = readJsonSafe('roadmap.json', null);
+  const instrData = readJsonSafe('instructions.json', []);
+  const recentInstructions = Array.isArray(instrData)
+    ? instrData.slice(-3).map(e => (e && e.text) ? String(e.text) : '').filter(Boolean) : [];
+  const selection = buildSelection(roadmap, recentInstructions);
   const targetSection = selection.target_section;
   const specificTask = selection.specific_task;
-  console.log(`[${CYCLE_TYPE}] 選定 → ${targetSection}: ${truncate(specificTask, 150)}`);
+  console.log(`[${CYCLE_TYPE}] フェーズ${selection.phase_id}「${selection.phase_title}」→ ${targetSection}: ${truncate(specificTask, 120)}`);
 
   // 生成→QA ループ
   const cycleNumber = logs.filter(l => l.cycle_type === CYCLE_TYPE).length + 1;
@@ -433,10 +488,17 @@ async function main() {
       null, 2
     ) + '\n', 'utf8');
 
+    // ロードマップのタスクを完了にし、フェーズが終われば次へ
+    if (roadmap && selection.task_id) {
+      markRoadmapDone(roadmap, selection.task_id);
+      fs.writeFileSync('roadmap.json', JSON.stringify(roadmap, null, 2) + '\n', 'utf8');
+    }
+
     logs.push({
       timestamp, cycle_type: CYCLE_TYPE, cycle_number: cycleNumber, result: 'success',
-      target_section: targetSection, task: truncate(specificTask, 200),
-      qa_note: 'PASS（AI-QA＋静的検証）', retry_count: 0
+      target_section: targetSection, task: truncate(selection.task_title || specificTask, 200),
+      phase_id: selection.phase_id, phase_title: selection.phase_title, task_id: selection.task_id,
+      qa_note: 'PASS（AI-QA＋静的検証＋行動ゲート）', retry_count: 0
     });
     fs.writeFileSync('logs.json', JSON.stringify(logs, null, 2) + '\n', 'utf8');
     console.log(`\n[${CYCLE_TYPE}] ✅ ${targetSection} セクションを更新しました（cycle#${cycleNumber}）。`);

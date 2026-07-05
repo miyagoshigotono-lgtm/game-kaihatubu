@@ -33,7 +33,14 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run meetings (セクション選定→生成→実行ゲート→QA→台本)
+      - name: Install Playwright Chromium (成長アルバム用スクショ)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install playwright@1.56.1 >/dev/null 2>&1 || npm install playwright >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1 || npx playwright install chromium >/dev/null 2>&1
+          echo "playwright 準備完了"
+
+      - name: Run meetings (選定→生成→実行/行動ゲート→QA→台本→スクショ)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ROUNDS: ${{ github.event.inputs.rounds || '1' }}
@@ -44,11 +51,15 @@ jobs:
           for i in $(seq 1 "$ROUNDS"); do
             echo "==================== 会議 $i / $ROUNDS ===================="
             node scripts/meeting.js || echo "会議 $i が異常終了（巻き戻し済みのはず。続行）"
-            git add game.html game.last-good.html logs.json feature_registry.json transcript.json
+            # ゲームに変化があった時だけ成長アルバム用のスクショを撮る
+            if ! git diff --quiet game.html; then
+              node scripts/screenshot.js || echo "スクショ失敗（続行）"
+            fi
+            git add game.html game.last-good.html logs.json feature_registry.json roadmap.json transcript.json screenshots
             if git diff --staged --quiet; then
               echo "変更なし（実行ゲート不合格など）。コミットをスキップ。"
             else
-              git commit -m "夜会議 #$i: game.html / 台本 を更新 [skip ci]"
+              git commit -m "夜会議 #$i: game.html / 台本 / アルバム を更新 [skip ci]"
               # ネットワーク失敗時は指数バックオフで最大4回プッシュを試す
               n=0; until [ $n -ge 4 ]; do
                 git push && break
