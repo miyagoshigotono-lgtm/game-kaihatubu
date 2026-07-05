@@ -189,43 +189,71 @@ function init() {
   if (!game.round || game.round < 1) game.round = 1;
   game.phase = 'dig';
   game.digsLeft = 10 + (game.round - 1) * 2;
-  game.player = { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) };
+  
+  // 地上レイアウト：上部2行は空、入り口は中央上部
+  const startX = Math.floor(COLS / 2);
+  const startY = 2; 
+  game.player = { x: startX, y: startY };
   game.monsters = [];
   game.heroes = [];
   game.particles = [];
+  game.cameraOffset = { x: 0, y: 0 }; // 画面揺れ用
 
   game.map = [];
   for (let x = 0; x < COLS; x++) {
     game.map[x] = [];
-    for (let y = 0; y < ROWS; y++) game.map[x][y] = { wall: true };
+    for (let y = 0; y < ROWS; y++) {
+      // 上部2行は空（壁なし）、それ以外は壁
+      game.map[x][y] = { wall: y >= 2 };
+    }
   }
-  game.map[game.player.x][game.player.y].wall = false;
-
-  game.message = 'ラウンド' + game.round + '：WASD/矢印キーで移動。壁に進むと掘れる（残り ' + game.digsLeft + '）';
+  
+  game.message = 'ラウン���' + game.round + '：WASDで採掘。魔王を導き迷宮を広げよ（残り ' + game.digsLeft + '）';
 }
 
 function startBattle() {
   game.phase = 'battle';
   spawnHeroes(2 + game.round);
-  game.message = '勇者が侵攻してきた！魔物たちよ、迎え撃て！';
+  game.message = '勇者が侵攻を開始した！';
+}
+
+function applyScreenShake() {
+  // 画面を軽く揺らすエフェクト
+  game.cameraOffset = { x: (Math.random() - 0.5) * 10, y: (Math.random() - 0.5) * 10 };
+  setTimeout(() => { game.cameraOffset = { x: 0, y: 0 }; }, 100);
 }
 
 function tryMove(dx, dy) {
-  if (game.phase === 'over' || game.phase === 'win') { if (game.phase === 'over') game.round = 1; init(); return; }
+  if (game.phase === 'over' || game.phase === 'win') { 
+    if (game.phase === 'over') game.round = 1; 
+    init(); return; 
+  }
+  
   const nx = game.player.x + dx, ny = game.player.y + dy;
   if (!inBounds(nx, ny)) return;
   const cell = game.map[nx][ny];
 
   if (cell.wall) {
     if (game.phase !== 'dig' || game.digsLeft <= 0) return;
+    
+    // 採掘実行
     cell.wall = false;
     game.digsLeft--;
+    
+    // 演出：画面揺れとパーティクル
+    applyScreenShake();
     addParticle(nx, ny, '#c879ff');
-    if (Math.random() < 0.75) spawnMonster(nx, ny);   // 掘った土から魔物が生まれる
+    
+    if (Math.random() < 0.75) spawnMonster(nx, ny);
     game.player.x = nx; game.player.y = ny;
-    if (game.digsLeft <= 0) startBattle();
-    else game.message = '採掘中… 残り ' + game.digsLeft;
+    
+    if (game.digsLeft <= 0) {
+      startBattle();
+    } else {
+      game.message = 'ガリッ... 採掘中... 残り ' + game.digsLeft;
+    }
   } else {
+    // 移動のみ
     game.player.x = nx; game.player.y = ny;
   }
 }
@@ -238,7 +266,10 @@ function onKey(e) {
     'arrowleft': [-1, 0], 'a': [-1, 0],
     'arrowright': [1, 0], 'd': [1, 0]
   };
-  if (moves[k]) { e.preventDefault(); tryMove(moves[k][0], moves[k][1]); }
+  if (moves[k]) { 
+    e.preventDefault(); 
+    tryMove(moves[k][0], moves[k][1]); 
+  }
 }
 window.addEventListener('keydown', onKey);
 // ===END:INIT_INPUT===
