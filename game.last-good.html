@@ -330,124 +330,109 @@ function render() {
   const W = COLS * TILE, H = ROWS * TILE;
   const skyHeight = TILE * 2;
 
-  // 背景描画
+  // 背景描画（空と地層）
   ctx.fillStyle = '#87CEEB';
   ctx.fillRect(0, 0, W, skyHeight);
-  ctx.fillStyle = '#2d1b0e'; // 地下深部の重厚な土色
+  ctx.fillStyle = '#2d1b0e';
   ctx.fillRect(0, skyHeight, W, H - skyHeight);
 
-  // 地形
+  // 地形描画
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       const c = game.map[x] && game.map[x][y];
       if (!c) continue;
       
-      const screenX = x * TILE;
-      const screenY = y * TILE;
-
+      const sx = x * TILE, sy = y * TILE;
       if (c.wall) {
-        // 壁：岩石の質感
-        ctx.fillStyle = '#4a3728';
-        ctx.fillRect(screenX, screenY, TILE, TILE);
-        // 凹凸感
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fillRect(screenX + 2, screenY + 2, TILE - 4, TILE - 4);
-        ctx.fillStyle = '#5d4736';
-        ctx.fillRect(screenX + 4, screenY + 4, TILE - 8, TILE - 8);
+        ctx.fillStyle = '#3d2b1f';
+        ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.strokeStyle = '#5c4432';
+        ctx.strokeRect(sx + 4, sy + 4, TILE - 8, TILE - 8);
       } else {
-        // 地面：掘削跡
+        ctx.fillStyle = '#1a110a';
+        ctx.fillRect(sx, sy, TILE, TILE);
         ctx.fillStyle = '#261a10';
-        ctx.fillRect(screenX, screenY, TILE, TILE);
-        // 掘削の跡（テクスチャ的なノイズ）
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
-        ctx.fillRect(screenX + 1, screenY + 1, TILE - 2, TILE - 2);
+        ctx.fillRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
       }
     }
   }
 
-  // 採掘可能方向のハイライト
+  // 入り口の描画
+  const entranceX = Math.floor(COLS / 2) * TILE;
+  ctx.fillStyle = '#4a2c1a';
+  ctx.fillRect(entranceX, skyHeight - TILE, TILE, TILE);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(entranceX + 8, skyHeight - TILE + 8, TILE - 16, TILE - 8);
+
+  // 採掘ハイライト
   if (game.phase === 'dig' && game.digsLeft > 0) {
     const p = game.player;
     const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
-    const pulse = Math.abs(Math.sin(Date.now() / 300));
-    
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.3 + pulse * 0.4})`;
-    
+    const pulse = Math.abs(Math.sin(Date.now() / 200));
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.4 + pulse * 0.4})`;
     for (const [dx, dy] of dirs) {
       const tx = p.x + dx, ty = p.y + dy;
       if (isWall(tx, ty)) {
-        const x = tx * TILE, y = ty * TILE;
-        ctx.strokeRect(x + 6, y + 6, TILE - 12, TILE - 12);
-        
+        ctx.strokeRect(tx * TILE + 4, ty * TILE + 4, TILE - 8, TILE - 8);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.font = '24px Arial';
+        ctx.font = '20px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('⛏', x + TILE / 2, y + TILE / 2 + 8);
-        ctx.textAlign = 'start';
+        ctx.fillText('⛏', tx * TILE + TILE / 2, ty * TILE + TILE / 2 + 7);
       }
     }
   }
 
-  // 魔物
+  // 魔物描画（種族ごとの独自形状）
   for (const m of game.monsters) {
     const cx = m.x * TILE + TILE / 2, cy = m.y * TILE + TILE / 2;
-    ctx.fillStyle = m.type === 1 ? '#ff4d4d' : '#4dff88';
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = m.type === 1 ? 'red' : 'green';
-    ctx.beginPath();
-    if (m.type === 1) {
-      ctx.moveTo(cx, cy - TILE * 0.3);
-      ctx.lineTo(cx + TILE * 0.3, cy + TILE * 0.3);
-      ctx.lineTo(cx - TILE * 0.3, cy + TILE * 0.3);
-    } else {
-      ctx.arc(cx, cy, TILE * 0.25, 0, Math.PI * 2);
+    ctx.save();
+    ctx.shadowBlur = 8;
+    if (m.type === 1) { // 攻撃的：赤い鋭角な角
+      ctx.fillStyle = '#ff3333';
+      ctx.shadowColor = '#ff3333';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 12); ctx.lineTo(cx + 12, cy + 10); ctx.lineTo(cx - 12, cy + 10);
+      ctx.fill();
+    } else if (m.type === 2) { // 守備的：緑の丸いスライム
+      ctx.fillStyle = '#33ff33';
+      ctx.shadowColor = '#33ff33';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+      ctx.fill();
+    } else { // その他：紫の多角形
+      ctx.fillStyle = '#cc33ff';
+      ctx.shadowColor = '#cc33ff';
+      ctx.fillRect(cx - 8, cy - 8, 16, 16);
     }
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   // 勇者
   for (const h of game.heroes) {
     ctx.fillStyle = '#f0e68c';
-    ctx.fillRect(h.x * TILE + 4, h.y * TILE + 4, TILE - 8, TILE - 8);
-    ctx.strokeStyle = '#daa520';
-    ctx.strokeRect(h.x * TILE + 4, h.y * TILE + 4, TILE - 8, TILE - 8);
+    ctx.fillRect(h.x * TILE + 6, h.y * TILE + 6, TILE - 12, TILE - 12);
+    ctx.fillStyle = '#daa520';
+    ctx.fillRect(h.x * TILE + 10, h.y * TILE + 8, 8, 4);
   }
 
   // 魔王
-  const px = game.player.x * TILE, py = game.player.y * TILE;
-  const pulse = (Math.sin(Date.now() / 150) + 1) / 2;
+  const px = game.player.x * TILE + TILE / 2, py = game.player.y * TILE + TILE / 2;
   ctx.save();
+  ctx.shadowBlur = 20;
   ctx.shadowColor = '#00ffff';
-  ctx.shadowBlur = 15 + pulse * 10;
   ctx.fillStyle = '#00ffff';
   ctx.beginPath();
-  ctx.arc(px + TILE / 2, py + TILE / 2, TILE * 0.3, 0, Math.PI * 2);
+  ctx.arc(px, py, 8, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // パーティクル（掘削エフェクト）
-  for (const p of game.particles) {
-    ctx.globalAlpha = Math.max(0, p.life);
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
   // HUD
-  ctx.fillStyle = 'rgba(0,0,0,0.9)';
+  ctx.fillStyle = 'rgba(0,0,0,0.8)';
   ctx.fillRect(0, H, W, HUD);
-  ctx.strokeStyle = '#444';
-  ctx.strokeRect(0, H, W, HUD);
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 18px monospace';
-  ctx.fillText(`ROUND: ${game.round} | 掘削回数: ${game.digsLeft}`, 20, H + 35);
-  ctx.fillStyle = '#aaa';
-  ctx.font = '14px monospace';
-  ctx.fillText(`魔物: ${game.monsters.length}  勇者: ${game.heroes.length}`, 20, H + 60);
+  ctx.font = '16px monospace';
+  ctx.fillText(`STAGE: ${game.stageLevel} | ROUND: ${game.round} | DIGS: ${game.digsLeft}`, 20, H + 30);
 }
 // ===END:RENDER===
 

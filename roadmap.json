@@ -48,7 +48,7 @@
           "id": "p2t2",
           "section": "RENDER",
           "title": "魔物の種族ごとに形・色・サイズを変え、一目で見分けられるようにする",
-          "done": false
+          "done": true
         },
         {
           "id": "p2t3",
