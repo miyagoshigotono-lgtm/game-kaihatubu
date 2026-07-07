@@ -104,10 +104,10 @@ function incrementCombo() {
 
 // ===SECTION:ECOSYSTEM===
 const SPECIES = {
-  PREY_A: { id: 0, name: 'スライム', speed: 0.6, energyMax: 40, color: '#a8e063', hp: 5, repro: 60 },
-  PREY_B: { id: 1, name: 'ラビット', speed: 0.3, energyMax: 30, color: '#f5d3e0', hp: 3, repro: 40 },
-  PRED_A: { id: 2, name: 'スパイダー', speed: 0.5, energyMax: 60, color: '#8e44ad', hp: 12, repro: 90 },
-  PRED_B: { id: 3, name: 'ウルフ', speed: 0.2, energyMax: 80, color: '#d35400', hp: 20, repro: 120 }
+  PREY_A: { id: 0, name: 'スライム', speed: 1, energyMax: 40, color: '#a8e063', hp: 5, repro: 60, size: 0.3 },
+  PREY_B: { id: 1, name: 'ラビット', speed: 0.5, energyMax: 30, color: '#f5d3e0', hp: 3, repro: 40, size: 0.4 },
+  PRED_A: { id: 2, name: 'スパイダー', speed: 0.8, energyMax: 60, color: '#8e44ad', hp: 12, repro: 90, size: 0.5 },
+  PRED_B: { id: 3, name: 'ウルフ', speed: 0.4, energyMax: 80, color: '#d35400', hp: 20, repro: 120, size: 0.6 }
 };
 
 function createMonster(x, y, speciesId) {
@@ -116,10 +116,10 @@ function createMonster(x, y, speciesId) {
     id: ++monsterId, x, y, 
     speciesId, 
     hp: s.hp, 
-    energy: s.energyMax * 0.8, 
-    cooldown: Math.random() * s.speed,
-    speed: s.speed,
-    isPredator: speciesId >= 2
+    energy: s.energyMax * 0.7, 
+    energyMax: s.energyMax,
+    isPredator: speciesId >= 2,
+    state: 'idle' // idle, hungry, hunting, reproducing
   };
 }
 
@@ -128,35 +128,44 @@ function spawnMonster(x, y) {
   game.monsters.push(createMonster(x, y, speciesId));
 }
 
-function updateEcosystem(dt) {
+function updateEcosystem() {
   for (let i = game.monsters.length - 1; i >= 0; i--) {
     const m = game.monsters[i];
     const s = Object.values(SPECIES)[m.speciesId];
-    m.energy -= dt * 2;
-    m.cooldown -= dt;
+    
+    m.energy -= 1;
+    
+    if (m.energy < s.energyMax * 0.3) m.state = 'hungry';
+    else if (m.energy > s.repro) m.state = 'reproducing';
+    else m.state = 'idle';
 
-    if (m.cooldown <= 0) {
-      const opts = groundNeighbors(m.x, m.y);
-      if (opts.length) { 
+    const opts = groundNeighbors(m.x, m.y);
+    if (opts.length > 0) {
+      const moveChance = (m.state === 'hungry' || m.state === 'hunting') ? 0.8 : 0.3;
+      if (Math.random() < moveChance) {
         const p = opts[(Math.random() * opts.length) | 0]; 
         m.x = p[0]; m.y = p[1]; 
       }
-      m.cooldown = s.speed + Math.random() * 0.2;
+    }
 
-      if (m.isPredator) {
-        const prey = game.monsters.find(o => !o.isPredator && o.x === m.x && o.y === m.y);
-        if (prey) { prey.hp -= 10; m.energy += 25; addParticle(m.x, m.y, '#ff0000'); }
-      }
-
-      const nh = nearestHero(m.x, m.y);
-      if (nh.hero && nh.dist <= 1) { nh.hero.hp -= (m.isPredator ? 3 : 1); }
-
-      if (m.energy > s.repro) {
-        m.energy -= (s.repro / 2);
-        game.monsters.push(createMonster(m.x, m.y, m.speciesId));
-        addParticle(m.x, m.y, s.color);
+    if (m.isPredator) {
+      const prey = game.monsters.find(o => !o.isPredator && o.x === m.x && o.y === m.y);
+      if (prey) { 
+        prey.hp -= 5; 
+        m.energy += 30; 
+        m.state = 'hunting';
       }
     }
+
+    const nh = nearestHero(m.x, m.y);
+    if (nh.hero && nh.dist <= 1) { nh.hero.hp -= (m.isPredator ? 2 : 1); }
+
+    if (m.state === 'reproducing' && opts.length > 0) {
+      m.energy -= (s.repro / 2);
+      const spawnPos = opts[(Math.random() * opts.length) | 0];
+      game.monsters.push(createMonster(spawnPos[0], spawnPos[1], m.speciesId));
+    }
+
     if (m.energy <= 0 || m.hp <= 0) game.monsters.splice(i, 1);
   }
 }
@@ -164,31 +173,27 @@ function updateEcosystem(dt) {
 function spawnHeroes(n) {
   const entryY = (ROWS / 2) | 0;
   for (let i = 0; i < n; i++) {
-    game.heroes.push({ x: 0, y: entryY, hp: 20 + game.round * 10, atk: 5, cooldown: 0 });
+    game.heroes.push({ x: 0, y: entryY, hp: 20 + game.stage * 10, atk: 5, cooldown: 0 });
   }
 }
 
-function updateHeroes(dt) {
+function updateHeroes() {
   for (let i = game.heroes.length - 1; i >= 0; i--) {
     const h = game.heroes[i];
-    h.cooldown -= dt;
-    if (h.cooldown <= 0) {
-      let target = null, bestD = Infinity;
-      for (const m of game.monsters) {
-        const d = Math.abs(m.x - h.x) + Math.abs(m.y - h.y);
-        if (d < bestD) { bestD = d; target = m; }
+    let target = null, bestD = Infinity;
+    for (const m of game.monsters) {
+      const d = Math.abs(m.x - h.x) + Math.abs(m.y - h.y);
+      if (d < bestD) { bestD = d; target = m; }
+    }
+    if (target) {
+      const dx = Math.sign(target.x - h.x), dy = Math.sign(target.y - h.y);
+      if (isGround(h.x + dx, h.y)) h.x += dx;
+      else if (isGround(h.x, h.y + dy)) h.y += dy;
+      
+      if (Math.abs(target.x - h.x) + Math.abs(target.y - h.y) <= 1) {
+        target.hp -= h.atk;
+        if (target.hp <= 0) game.monsters = game.monsters.filter(o => o.id !== target.id);
       }
-      if (target) {
-        const dx = Math.sign(target.x - h.x), dy = Math.sign(target.y - h.y);
-        if (isGround(h.x + dx, h.y)) h.x += dx;
-        else if (isGround(h.x, h.y + dy)) h.y += dy;
-        
-        if (Math.abs(target.x - h.x) + Math.abs(target.y - h.y) <= 1) {
-          target.hp -= h.atk;
-          if (target.hp <= 0) game.monsters = game.monsters.filter(o => o.id !== target.id);
-        }
-      }
-      h.cooldown = 0.8;
     }
     if (h.hp <= 0) game.heroes.splice(i, 1);
   }
