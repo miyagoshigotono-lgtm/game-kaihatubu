@@ -104,22 +104,26 @@ function incrementCombo() {
 
 // ===SECTION:ECOSYSTEM===
 const SPECIES = {
-  PREY_A: { id: 0, name: 'スライム', speed: 1, energyMax: 40, color: '#a8e063', hp: 5, repro: 60, size: 0.3 },
-  PREY_B: { id: 1, name: 'ラビット', speed: 0.5, energyMax: 30, color: '#f5d3e0', hp: 3, repro: 40, size: 0.4 },
-  PRED_A: { id: 2, name: 'スパイダー', speed: 0.8, energyMax: 60, color: '#8e44ad', hp: 12, repro: 90, size: 0.5 },
-  PRED_B: { id: 3, name: 'ウルフ', speed: 0.4, energyMax: 80, color: '#d35400', hp: 20, repro: 120, size: 0.6 }
+  PREY_A: { id: 0, name: 'スライム', speed: 1, energyMax: 40, color: '#a8e063', hp: 5, repro: 60, size: 0.3, atk: 1 },
+  PREY_B: { id: 1, name: 'ラビット', speed: 1.5, energyMax: 30, color: '#f5d3e0', hp: 3, repro: 40, size: 0.4, atk: 0.5 },
+  PRED_A: { id: 2, name: 'スパイダー', speed: 0.8, energyMax: 60, color: '#8e44ad', hp: 12, repro: 90, size: 0.5, atk: 3 },
+  PRED_B: { id: 3, name: 'ウルフ', speed: 1.2, energyMax: 80, color: '#d35400', hp: 20, repro: 120, size: 0.6, atk: 4 }
 };
+
+const HERO_CLASSES = {
+  WARRIOR: { name: '戦士', hp: 30, atk: 5, speed: 1, color: '#e74c3c' },
+  MAGE: { name: '魔法使い', hp: 15, atk: 8, speed: 0.5, color: '#3498db' }
+};
+
+if (typeof window.monsterId === 'undefined') window.monsterId = 0;
 
 function createMonster(x, y, speciesId) {
   const s = Object.values(SPECIES)[speciesId];
   return { 
-    id: ++monsterId, x, y, 
-    speciesId, 
-    hp: s.hp, 
-    energy: s.energyMax * 0.7, 
-    energyMax: s.energyMax,
-    isPredator: speciesId >= 2,
-    state: 'idle' // idle, hungry, hunting, reproducing
+    id: ++window.monsterId, x, y, 
+    speciesId, hp: s.hp, energy: s.energyMax * 0.7, 
+    energyMax: s.energyMax, isPredator: speciesId >= 2,
+    state: 'idle'
   };
 }
 
@@ -134,31 +138,26 @@ function updateEcosystem() {
     const s = Object.values(SPECIES)[m.speciesId];
     
     m.energy -= 1;
-    
     if (m.energy < s.energyMax * 0.3) m.state = 'hungry';
     else if (m.energy > s.repro) m.state = 'reproducing';
     else m.state = 'idle';
 
     const opts = groundNeighbors(m.x, m.y);
-    if (opts.length > 0) {
-      const moveChance = (m.state === 'hungry' || m.state === 'hunting') ? 0.8 : 0.3;
-      if (Math.random() < moveChance) {
-        const p = opts[(Math.random() * opts.length) | 0]; 
-        m.x = p[0]; m.y = p[1]; 
-      }
+    if (opts.length > 0 && Math.random() < (m.state === 'hungry' ? 0.9 : 0.4) * s.speed) {
+      const p = opts[(Math.random() * opts.length) | 0]; 
+      m.x = p[0]; m.y = p[1]; 
     }
 
     if (m.isPredator) {
       const prey = game.monsters.find(o => !o.isPredator && o.x === m.x && o.y === m.y);
       if (prey) { 
-        prey.hp -= 5; 
+        prey.hp -= s.atk; 
         m.energy += 30; 
-        m.state = 'hunting';
       }
     }
 
     const nh = nearestHero(m.x, m.y);
-    if (nh.hero && nh.dist <= 1) { nh.hero.hp -= (m.isPredator ? 2 : 1); }
+    if (nh.hero && nh.dist === 0) { nh.hero.hp -= s.atk; }
 
     if (m.state === 'reproducing' && opts.length > 0) {
       m.energy -= (s.repro / 2);
@@ -171,28 +170,39 @@ function updateEcosystem() {
 }
 
 function spawnHeroes(n) {
-  const entryY = (ROWS / 2) | 0;
   for (let i = 0; i < n; i++) {
-    game.heroes.push({ x: 0, y: entryY, hp: 20 + game.stage * 10, atk: 5, cooldown: 0 });
+    const type = Math.random() < 0.7 ? HERO_CLASSES.WARRIOR : HERO_CLASSES.MAGE;
+    game.heroes.push({ 
+      x: 0, y: (ROWS / 2) | 0, 
+      hp: type.hp + (game.stage * 5), 
+      atk: type.atk, 
+      class: type,
+      moveTimer: 0 
+    });
   }
 }
 
 function updateHeroes() {
   for (let i = game.heroes.length - 1; i >= 0; i--) {
     const h = game.heroes[i];
-    let target = null, bestD = Infinity;
-    for (const m of game.monsters) {
-      const d = Math.abs(m.x - h.x) + Math.abs(m.y - h.y);
-      if (d < bestD) { bestD = d; target = m; }
-    }
-    if (target) {
-      const dx = Math.sign(target.x - h.x), dy = Math.sign(target.y - h.y);
-      if (isGround(h.x + dx, h.y)) h.x += dx;
-      else if (isGround(h.x, h.y + dy)) h.y += dy;
-      
-      if (Math.abs(target.x - h.x) + Math.abs(target.y - h.y) <= 1) {
-        target.hp -= h.atk;
-        if (target.hp <= 0) game.monsters = game.monsters.filter(o => o.id !== target.id);
+    h.moveTimer += h.class.speed;
+    
+    if (h.moveTimer >= 1) {
+      h.moveTimer = 0;
+      let target = null, bestD = Infinity;
+      game.monsters.forEach(m => {
+        const d = Math.abs(m.x - h.x) + Math.abs(m.y - h.y);
+        if (d < bestD) { bestD = d; target = m; }
+      });
+
+      if (target) {
+        if (bestD > 0) {
+          const dx = Math.sign(target.x - h.x), dy = Math.sign(target.y - h.y);
+          if (isGround(h.x + dx, h.y)) h.x += dx;
+          else if (isGround(h.x, h.y + dy)) h.y += dy;
+        } else {
+          target.hp -= h.atk;
+        }
       }
     }
     if (h.hp <= 0) game.heroes.splice(i, 1);
@@ -205,10 +215,10 @@ function groundNeighbors(x, y) {
 
 function nearestHero(x, y) {
   let best = null, bestD = Infinity;
-  for (const h of game.heroes) {
+  game.heroes.forEach(h => {
     const d = Math.abs(h.x - x) + Math.abs(h.y - y);
     if (d < bestD) { bestD = d; best = h; }
-  }
+  });
   return { hero: best, dist: bestD };
 }
 // ===END:ECOSYSTEM===
