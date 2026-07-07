@@ -335,13 +335,13 @@ function render() {
   const W = COLS * TILE, H = ROWS * TILE;
   const skyHeight = TILE * 2;
 
-  // 背景描画（空と地層）
+  // 背景描画：空と地層のコントラスト強化
   ctx.fillStyle = '#87CEEB';
   ctx.fillRect(0, 0, W, skyHeight);
-  ctx.fillStyle = '#2d1b0e';
+  ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(0, skyHeight, W, H - skyHeight);
 
-  // 地形描画
+  // 地形描画：壁と通路の質感向上
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       const c = game.map[x] && game.map[x][y];
@@ -349,95 +349,104 @@ function render() {
       
       const sx = x * TILE, sy = y * TILE;
       if (c.wall) {
-        ctx.fillStyle = '#3d2b1f';
+        // 重厚な壁
+        ctx.fillStyle = '#4a3728';
         ctx.fillRect(sx, sy, TILE, TILE);
-        ctx.strokeStyle = '#5c4432';
-        ctx.strokeRect(sx + 4, sy + 4, TILE - 8, TILE - 8);
+        ctx.strokeStyle = '#2b1f15';
+        ctx.strokeRect(sx, sy, TILE, TILE);
+        ctx.fillStyle = '#5c4432';
+        ctx.fillRect(sx + 4, sy + 4, TILE - 8, TILE - 8);
       } else {
-        ctx.fillStyle = '#1a110a';
+        // 深い迷宮の床
+        ctx.fillStyle = '#0d0d0d';
         ctx.fillRect(sx, sy, TILE, TILE);
-        ctx.fillStyle = '#261a10';
-        ctx.fillRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.strokeRect(sx, sy, TILE, TILE);
       }
     }
   }
 
-  // 入り口の描画
-  const entranceX = Math.floor(COLS / 2) * TILE;
-  ctx.fillStyle = '#4a2c1a';
-  ctx.fillRect(entranceX, skyHeight - TILE, TILE, TILE);
-  ctx.fillStyle = '#111';
-  ctx.fillRect(entranceX + 8, skyHeight - TILE + 8, TILE - 16, TILE - 8);
-
-  // 採掘ハイライト
+  // 採掘ハイライト：脈動するエフェクト
   if (game.phase === 'dig' && game.digsLeft > 0) {
     const p = game.player;
-    const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
-    const pulse = Math.abs(Math.sin(Date.now() / 200));
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.4 + pulse * 0.4})`;
-    for (const [dx, dy] of dirs) {
+    const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.3 + pulse * 0.5})`;
+    
+    [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
       const tx = p.x + dx, ty = p.y + dy;
       if (isWall(tx, ty)) {
-        ctx.strokeRect(tx * TILE + 4, ty * TILE + 4, TILE - 8, TILE - 8);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.font = '20px Arial';
+        ctx.strokeRect(tx * TILE + 6, ty * TILE + 6, TILE - 12, TILE - 12);
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.6 + pulse * 0.4})`;
+        ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('⛏', tx * TILE + TILE / 2, ty * TILE + TILE / 2 + 7);
+        ctx.fillText('⛏', tx * TILE + TILE / 2, ty * TILE + TILE / 2 + 8);
       }
-    }
+    });
   }
 
-  // 魔物描画（種族ごとの独自形状）
-  for (const m of game.monsters) {
+  // 魔物の描画：種族ごとの特徴とエフェクト
+  game.monsters.forEach(m => {
     const cx = m.x * TILE + TILE / 2, cy = m.y * TILE + TILE / 2;
+    const time = Date.now() / 200;
+    const bounce = Math.sin(time + m.id) * 2;
+    
     ctx.save();
-    ctx.shadowBlur = 8;
-    if (m.type === 1) { // 攻撃的：赤い鋭角な角
-      ctx.fillStyle = '#ff3333';
-      ctx.shadowColor = '#ff3333';
+    ctx.shadowBlur = 15;
+    if (m.type === 1) { // 攻撃的：鋭角
+      ctx.fillStyle = '#ff4444';
+      ctx.shadowColor = '#ff4444';
       ctx.beginPath();
-      ctx.moveTo(cx, cy - 12); ctx.lineTo(cx + 12, cy + 10); ctx.lineTo(cx - 12, cy + 10);
+      ctx.moveTo(cx, cy - 12 + bounce); ctx.lineTo(cx + 10, cy + 8 + bounce); ctx.lineTo(cx - 10, cy + 8 + bounce);
       ctx.fill();
-    } else if (m.type === 2) { // 守備的：緑の丸いスライム
-      ctx.fillStyle = '#33ff33';
-      ctx.shadowColor = '#33ff33';
+    } else if (m.type === 2) { // 守備的：丸型
+      ctx.fillStyle = '#44ff44';
+      ctx.shadowColor = '#44ff44';
       ctx.beginPath();
-      ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+      ctx.arc(cx, cy + bounce, 8, 0, Math.PI * 2);
       ctx.fill();
-    } else { // その他：紫の多角形
-      ctx.fillStyle = '#cc33ff';
-      ctx.shadowColor = '#cc33ff';
-      ctx.fillRect(cx - 8, cy - 8, 16, 16);
+    } else { // その他：多角形
+      ctx.fillStyle = '#aa44ff';
+      ctx.shadowColor = '#aa44ff';
+      ctx.fillRect(cx - 7, cy - 7 + bounce, 14, 14);
+    }
+    
+    // 捕食・繁殖エフェクト
+    if (m.justInteracted) {
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 15 + bounce * 2, 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.restore();
-  }
+  });
 
   // 勇者
-  for (const h of game.heroes) {
-    ctx.fillStyle = '#f0e68c';
-    ctx.fillRect(h.x * TILE + 6, h.y * TILE + 6, TILE - 12, TILE - 12);
-    ctx.fillStyle = '#daa520';
-    ctx.fillRect(h.x * TILE + 10, h.y * TILE + 8, 8, 4);
-  }
+  game.heroes.forEach(h => {
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(h.x * TILE + 4, h.y * TILE + 4, TILE - 8, TILE - 8);
+    ctx.fillStyle = '#b8860b';
+    ctx.fillRect(h.x * TILE + 8, h.y * TILE + 6, TILE - 16, 6);
+  });
 
   // 魔王
   const px = game.player.x * TILE + TILE / 2, py = game.player.y * TILE + TILE / 2;
   ctx.save();
-  ctx.shadowBlur = 20;
+  ctx.shadowBlur = 25;
   ctx.shadowColor = '#00ffff';
-  ctx.fillStyle = '#00ffff';
+  ctx.fillStyle = '#e0ffff';
   ctx.beginPath();
-  ctx.arc(px, py, 8, 0, Math.PI * 2);
+  ctx.arc(px, py, 10, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
   // HUD
-  ctx.fillStyle = 'rgba(0,0,0,0.8)';
-  ctx.fillRect(0, H, W, HUD);
-  ctx.fillStyle = '#fff';
-  ctx.font = '16px monospace';
-  ctx.fillText(`STAGE: ${game.stageLevel} | ROUND: ${game.round} | DIGS: ${game.digsLeft}`, 20, H + 30);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+  ctx.fillRect(0, H, W, 60);
+  ctx.fillStyle = '#00ffff';
+  ctx.font = 'bold 18px Arial';
+  ctx.fillText(`STAGE: ${game.stageLevel} | ROUND: ${game.round} | DIGS: ${game.digsLeft}`, 20, H + 35);
 }
 // ===END:RENDER===
 
