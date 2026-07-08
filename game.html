@@ -315,27 +315,60 @@ window.addEventListener('keydown', onKey);
 // ===END:INIT_INPUT===
 
 // ===SECTION:UPDATE===
-// 毎フレームの状態更新。パーティクル・生態系・勇者・勝敗判定。
 function update(dt) {
+  // パーティクルの更新
   for (let i = game.particles.length - 1; i >= 0; i--) {
     const p = game.particles[i];
-    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.5;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt * 1.5;
     if (p.life <= 0) game.particles.splice(i, 1);
   }
 
+  // ステージレベルに応じた勇者侵攻ロジックの強化
+  // 魔物の数や種類（生態系の強さ）を勇者が感知するAI補正
+  const updateHeroStrategy = () => {
+    const totalMonsterPower = game.monsters.reduce((acc, m) => acc + m.power, 0);
+    game.heroes.forEach(h => {
+      // 魔物が多いほど勇者は慎重に（または集団で）攻める補正
+      h.aggression = 1.0 + (game.round * 0.2) + (totalMonsterPower > 50 ? 0.5 : 0);
+      h.target = game.monsters.length > 0 ? game.monsters[0] : null;
+    });
+  };
+
   if (game.phase === 'dig') {
-    updateEcosystem(dt);   // 採掘中も魔物は少しずつ生きる
+    // 採掘フェイズ：魔王の移動に合わせて魔物も1歩動く仕様を反映
+    // 生態系更新は updateEcosystem に集約
+    updateEcosystem(); 
   } else if (game.phase === 'battle') {
-    updateEcosystem(dt);
+    // バトルフェイズ：勇者の侵攻強化と生態系の連鎖
+    updateHeroStrategy();
+    updateEcosystem();
     updateHeroes(dt);
+
+    // 勝敗判定
     if (game.heroes.length === 0) {
       game.phase = 'win';
       game.round++;
-      game.message = '防衛成功！ ラウンド' + game.round + 'へ（WASDで再開）';
+      game.message = `第${game.round}ラウンドへ突入！ 勇者の増援が近づく...`;
+      spawnHeroesForStage(game.round); // ステージレベルに応じた勇者生成
     } else if (game.monsters.length === 0) {
       game.phase = 'over';
-      game.message = '魔物が全滅した… 敗北（WASDで再挑戦）';
+      game.message = '魔物が全滅した… 敗北。WASDで再挑戦';
     }
+  }
+}
+
+function spawnHeroesForStage(round) {
+  // ステージレベル(round)に応じて勇者の数と強さを調整
+  const heroCount = Math.min(1 + Math.floor(round / 2), 5);
+  for (let i = 0; i < heroCount; i++) {
+    game.heroes.push({
+      x: 0, y: 0, 
+      hp: 10 * round, 
+      level: round,
+      aggression: 1.0
+    });
   }
 }
 // ===END:UPDATE===
