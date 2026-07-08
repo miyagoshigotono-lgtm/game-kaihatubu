@@ -79,7 +79,7 @@
           "id": "p3t2",
           "section": "RENDER",
           "title": "勇者のHPバーや、攻撃・被弾のエフェクトを描いて戦況を見えるようにする",
-          "done": false
+          "done": true
         },
         {
           "id": "p3t3",
