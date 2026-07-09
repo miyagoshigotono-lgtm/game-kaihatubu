@@ -52,18 +52,42 @@ const game = {
   stage: 1,
   round: 1,
   phase: 'dig',
-  digsLeft: 15 + (5 * 1), // ステージに応じて増加
+  digsLeft: 15,
+  
+  // 永続的な成長要素（ラウンドをまたいで保持）
+  meta: {
+    totalExperience: 0, // 累計経験値
+    evolutionPoints: 0, // 進化ポイント（魔物のステータス強化に使用）
+    maxStageReached: 1, // 到達した最高ステージ
+    digEfficiency: 1,   // 採掘効率（一度の行動で掘れる深さや確率補正）
+    monsterSpawnRate: 1 // 魔物生成率のボーナス倍率
+  },
+
   combo: 0,
   maxCombo: 0,
+  
   player: { 
     x: Math.floor(COLS / 2), 
-    y: 2 // 地上入り口(2行目)からスタート
+    y: 2 
   },
+  
   map: [],
   monsters: [],
   heroes: [],
   particles: [],
-  message: 'ダンジョンを掘り進め！'
+  
+  message: 'ステージ1開始：勇者が侵攻してくるぞ！',
+  
+  // 状態のリセット（ラウンド開始時に呼び出す）
+  initRound() {
+    this.round++;
+    this.digsLeft = 15 + (this.stage * 5);
+    this.combo = 0;
+    this.monsters = [];
+    this.heroes = [];
+    this.particles = [];
+    this.message = `ラウンド ${this.round} 開始。ダンジョンを拡張せよ！`;
+  }
 };
 
 function inBounds(x, y) {
@@ -99,6 +123,8 @@ function incrementCombo() {
   if (game.combo > game.maxCombo) {
     game.maxCombo = game.combo;
   }
+  // コンボに応じてメタ的な報酬（経験値など）を蓄積
+  game.meta.totalExperience += game.combo * 10;
 }
 // ===END:STATE===
 

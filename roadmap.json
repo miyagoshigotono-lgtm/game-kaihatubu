@@ -98,7 +98,7 @@
           "id": "p4t1",
           "section": "STATE",
           "title": "ラウンドをまたいで受け継がれる成長要素（スコアや強化）を追加する",
-          "done": false
+          "done": true
         },
         {
           "id": "p4t2",
