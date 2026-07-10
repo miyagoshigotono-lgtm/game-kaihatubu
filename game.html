@@ -250,91 +250,103 @@ function nearestHero(x, y) {
 // ===END:ECOSYSTEM===
 
 // ===SECTION:INIT_INPUT===
-// ラウンド初期化と、魔王の操作（移動＝隣接壁の採掘）。
 function init() {
-  if (!game.round || game.round < 1) game.round = 1;
+  if (!game.round) game.round = 1;
   game.phase = 'dig';
-  game.digsLeft = 10 + (game.round - 1) * 2;
-  
-  // 地上レイアウト：上部2行は空、入り口は中央上部
+  game.digsLeft = 10 + (game.round - 1) * 3;
+  game.filters = []; // 間接干渉：環境フィルター（例：移動速度低下、栄養素供給）
+
   const startX = Math.floor(COLS / 2);
-  const startY = 2; 
+  const startY = 2;
   game.player = { x: startX, y: startY };
   game.monsters = [];
   game.heroes = [];
   game.particles = [];
-  game.cameraOffset = { x: 0, y: 0 }; // 画面揺れ用
+  game.cameraOffset = { x: 0, y: 0 };
 
   game.map = [];
   for (let x = 0; x < COLS; x++) {
     game.map[x] = [];
     for (let y = 0; y < ROWS; y++) {
-      // 上部2行は空（壁なし）、それ以外は壁
-      game.map[x][y] = { wall: y >= 2 };
+      game.map[x][y] = { 
+        wall: y >= 2, 
+        isSky: y < 2,
+        filter: null // マスごとの環境フィルター
+      };
     }
   }
   
-  game.message = 'ラウン���' + game.round + '：WASDで採掘。魔王を導き迷宮を広げよ（残り ' + game.digsLeft + '）';
+  game.message = `ステージ ${game.round}：WASDで採掘。魔王の��みに呼応し魔物が蠢く。残り ${game.digsLeft}回`;
 }
 
 function startBattle() {
   game.phase = 'battle';
-  spawnHeroes(2 + game.round);
-  game.message = '勇者が侵攻を開始した！';
+  spawnHeroes(game.round); // ステージ数に応じた勇者数
+  game.message = '侵攻開始！魔王の迷宮が試される。';
 }
 
 function applyScreenShake() {
-  // 画面を軽く揺らすエフェクト
-  game.cameraOffset = { x: (Math.random() - 0.5) * 10, y: (Math.random() - 0.5) * 10 };
-  setTimeout(() => { game.cameraOffset = { x: 0, y: 0 }; }, 100);
+  const shake = () => {
+    game.cameraOffset = { x: (Math.random() - 0.5) * 12, y: (Math.random() - 0.5) * 12 };
+    requestAnimationFrame(() => setTimeout(() => game.cameraOffset = { x: 0, y: 0 }, 50));
+  };
+  shake();
+}
+
+function updateMonsters() {
+  // 魔王の動きに合わせて魔物も1歩進む
+  game.monsters.forEach(m => {
+    const dx = Math.sign(game.player.x - m.x);
+    const dy = Math.sign(game.player.y - m.y);
+    if (!game.map[m.x + dx]?.[m.y + dy]?.wall) {
+      m.x += dx; m.y += dy;
+    }
+  });
 }
 
 function tryMove(dx, dy) {
-  if (game.phase === 'over' || game.phase === 'win') { 
-    if (game.phase === 'over') game.round = 1; 
-    init(); return; 
+  if (game.phase === 'over' || game.phase === 'win') {
+    if (game.phase === 'over') game.round = 1;
+    init(); return;
   }
-  
+
   const nx = game.player.x + dx, ny = game.player.y + dy;
-  if (!inBounds(nx, ny)) return;
+  if (!inBounds(nx, ny) || game.map[nx][ny].isSky) return;
+
   const cell = game.map[nx][ny];
 
   if (cell.wall) {
     if (game.phase !== 'dig' || game.digsLeft <= 0) return;
-    
-    // 採掘実行
+
     cell.wall = false;
     game.digsLeft--;
-    
-    // 演出：画面揺れとパーティクル
     applyScreenShake();
-    addParticle(nx, ny, '#c879ff');
+    addParticle(nx, ny, '#4a90e2');
+
+    if (Math.random() < 0.8) spawnMonster(nx, ny);
     
-    if (Math.random() < 0.75) spawnMonster(nx, ny);
-    game.player.x = nx; game.player.y = ny;
-    
-    if (game.digsLeft <= 0) {
-      startBattle();
-    } else {
-      game.message = 'ガリッ... 採掘中... 残り ' + game.digsLeft;
+    // 設置型間接干渉：掘った場所に「魔力溜まり」を配置（魔物の成長を促進するゾーン）
+    if (game.digsLeft % 5 === 0) {
+      cell.filter = 'mana_pool';
+      game.message = '魔力溜まりを設置した！魔物の進化が加速する。';
     }
-  } else {
-    // 移動のみ
+
     game.player.x = nx; game.player.y = ny;
+    updateMonsters();
+
+    if (game.digsLeft <= 0) startBattle();
+    else game.message = `深淵を刻む... 残り ${game.digsLeft}回`;
+  } else {
+    game.player.x = nx; game.player.y = ny;
+    updateMonsters();
   }
 }
 
 function onKey(e) {
-  const k = (e.key || '').toLowerCase();
-  const moves = {
-    'arrowup': [0, -1], 'w': [0, -1],
-    'arrowdown': [0, 1], 's': [0, 1],
-    'arrowleft': [-1, 0], 'a': [-1, 0],
-    'arrowright': [1, 0], 'd': [1, 0]
-  };
-  if (moves[k]) { 
-    e.preventDefault(); 
-    tryMove(moves[k][0], moves[k][1]); 
+  const moves = { 'w': [0, -1], 's': [0, 1], 'a': [-1, 0], 'd': [1, 0] };
+  if (moves[e.key.toLowerCase()]) {
+    e.preventDefault();
+    tryMove(...moves[e.key.toLowerCase()]);
   }
 }
 window.addEventListener('keydown', onKey);
