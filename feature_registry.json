@@ -2,9 +2,9 @@
   "version": 4,
   "reset_note": "ロードマップ制で再スタート。会議はフェーズの現在タスクだけを進める。",
   "recent_sections": [
-    "UPDATE",
     "STATE",
     "RENDER",
+    "INIT_INPUT",
     "INIT_INPUT"
   ],
   "implemented_features": [
