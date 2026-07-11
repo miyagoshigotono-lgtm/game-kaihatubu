@@ -419,29 +419,31 @@ function render() {
 
   // 背景：空（水色グラデーション）
   const skyGrad = ctx.createLinearGradient(0, 0, 0, skyHeight);
-  skyGrad.addColorStop(0, '#87CEEB');
-  skyGrad.addColorStop(1, '#E0F7FA');
+  skyGrad.addColorStop(0, '#4facfe');
+  skyGrad.addColorStop(1, '#00f2fe');
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, W, skyHeight);
   
-  // 地下背景
+  // 地下背景（深みのある暗色）
   ctx.fillStyle = '#050508';
   ctx.fillRect(0, skyHeight, W, H - skyHeight);
 
-  // 地形描画
+  // 地形描画（迷宮らしさ：壁にテクスチャ感を追加）
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       const c = game.map[x] && game.map[x][y];
       if (!c) continue;
       const sx = x * TILE, sy = y * TILE;
       if (c.wall) {
+        // 壁：重厚な質感
         ctx.fillStyle = '#1a1a24';
-        ctx.fillRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
-        ctx.strokeStyle = '#333344';
-        ctx.strokeRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
-        ctx.fillStyle = '#2a2a35';
-        ctx.fillRect(sx + TILE/4, sy + TILE/4, TILE/2, TILE/2);
+        ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.strokeStyle = '#2a2a35';
+        ctx.strokeRect(sx + 4, sy + 4, TILE - 8, TILE - 8);
+        ctx.fillStyle = '#3d3d4d';
+        ctx.fillRect(sx + 6, sy + 6, TILE - 12, TILE - 12);
       } else {
+        // 地面：掘った跡のくぼみ感
         ctx.fillStyle = '#0a0a0c';
         ctx.fillRect(sx, sy, TILE, TILE);
         ctx.strokeStyle = '#121218';
@@ -450,78 +452,81 @@ function render() {
     }
   }
 
-  // 採掘インジケーター
+  // 採掘インジケーター（脈動する光の演出）
   if (game.phase === 'dig' && game.digsLeft > 0) {
-    const pulse = (Math.sin(now / 200) + 1) / 2;
+    const pulse = (Math.sin(now / 150) + 1) / 2;
     [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
       const tx = game.player.x + dx, ty = game.player.y + dy;
       if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS && game.map[tx][ty].wall) {
-        ctx.shadowBlur = 15 * pulse;
+        ctx.shadowBlur = 10 + pulse * 10;
         ctx.shadowColor = '#00f2fe';
-        ctx.strokeStyle = `rgba(0, 242, 254, ${0.4 + pulse * 0.4})`;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(tx * TILE + 4, ty * TILE + 4, TILE - 8, TILE - 8);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 + pulse * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(tx * TILE + 6, ty * TILE + 6, TILE - 12, TILE - 12);
         ctx.shadowBlur = 0;
       }
     });
   }
 
-  // 魔物
+  // 魔物（種族ごとの独自アニメーションとエフェクト）
   game.monsters.forEach(m => {
     const cx = m.x * TILE + TILE / 2, cy = m.y * TILE + TILE / 2;
-    const bounce = Math.sin(now / 200 + m.id) * 3;
+    const bounce = Math.sin(now / 150 + m.id) * 4;
     ctx.save();
-    if (m.type === 1) {
+    if (m.type === 1) { // アタッカー：鋭い赤
       ctx.fillStyle = '#ff4757';
-      ctx.beginPath(); ctx.moveTo(cx, cy - 10 + bounce); ctx.lineTo(cx + 8, cy + 8 + bounce); ctx.lineTo(cx - 8, cy + 8 + bounce); ctx.fill();
-    } else if (m.type === 2) {
+      ctx.beginPath(); ctx.moveTo(cx, cy - 8 + bounce); ctx.lineTo(cx + 10, cy + 8 + bounce); ctx.lineTo(cx - 10, cy + 8 + bounce); ctx.fill();
+    } else if (m.type === 2) { // タンク：丸い緑
       ctx.fillStyle = '#2ed573';
-      ctx.beginPath(); ctx.arc(cx, cy + bounce, 7, 0, Math.PI * 2); ctx.fill();
-    } else {
+      ctx.beginPath(); ctx.arc(cx, cy + bounce, 8, 0, Math.PI * 2); ctx.fill();
+    } else { // 速度型：青い四角
       ctx.fillStyle = '#1e90ff';
-      ctx.fillRect(cx - 6, cy - 6 + bounce, 12, 12);
+      ctx.fillRect(cx - 7, cy - 7 + bounce, 14, 14);
     }
+    // 捕食時のエフェクト
     if (m.justFed) {
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(cx - 10, cy - 10 + bounce, 20, 20);
+      ctx.shadowBlur = 15; ctx.shadowColor = '#fff';
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(cx - 12, cy - 12 + bounce, 24, 24);
     }
     ctx.restore();
   });
 
-  // 勇者
+  // 勇者（HPバーと侵攻の緊張感）
   game.heroes.forEach(h => {
     const hx = h.x * TILE, hy = h.y * TILE;
     ctx.fillStyle = '#f1c40f';
-    ctx.beginPath(); ctx.arc(hx + TILE/2, hy + TILE/2, TILE/3, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#333'; ctx.fillRect(hx + 5, hy - 8, TILE - 10, 4);
+    ctx.beginPath(); ctx.arc(hx + TILE/2, hy + TILE/2, 12, 0, Math.PI*2); ctx.fill();
+    // HPバー
+    ctx.fillStyle = '#333'; ctx.fillRect(hx + 2, hy - 10, TILE - 4, 6);
     ctx.fillStyle = '#e74c3c';
-    ctx.fillRect(hx + 5, hy - 8, (TILE - 10) * (h.hp / h.maxHp), 4);
+    ctx.fillRect(hx + 2, hy - 10, (TILE - 4) * (h.hp / h.maxHp), 6);
   });
 
-  // 魔王
+  // 魔王（光り輝くカーソル）
   ctx.save();
-  ctx.shadowBlur = 20; ctx.shadowColor = '#4facfe';
+  ctx.shadowBlur = 25; ctx.shadowColor = '#fff';
   ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2, 8, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
-  // HUD
-  ctx.fillStyle = 'rgba(0,0,0,0.8)';
+  // HUD（UIの視認性向上）
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
   ctx.fillRect(0, H, W, 60);
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 20px Arial';
-  ctx.fillText(`STAGE: ${game.stageLevel} | ROUND: ${game.round} | DIGS: ${game.digsLeft}`, 20, H + 38);
+  ctx.fillStyle = '#00f2fe';
+  ctx.font = 'bold 18px "Courier New"';
+  ctx.fillText(`STAGE: ${game.stageLevel} | ROUND: ${game.round} | DIGS: ${game.digsLeft}`, 20, H + 35);
 
-  // 演出
+  // 終了演出
   if (game.gameOver || game.victory) {
-    ctx.fillStyle = 'rgba(0,0,0,0.9)';
+    ctx.fillStyle = 'rgba(0,0,0,0.95)';
     ctx.fillRect(0, 0, W, H + 60);
     ctx.fillStyle = game.victory ? '#ffd700' : '#ff4757';
-    ctx.font = 'bold 50px Arial';
+    ctx.font = 'bold 60px "Arial Black"';
     ctx.textAlign = 'center';
     ctx.fillText(game.victory ? 'STAGE CLEAR' : 'GAME OVER', W / 2, H / 2);
-    ctx.font = '20px Arial';
+    ctx.font = '24px Arial';
     ctx.fillStyle = '#fff';
-    ctx.fillText('PRESS SPACE TO CONTINUE', W / 2, H / 2 + 50);
+    ctx.fillText('PRESS SPACE TO CONTINUE', W / 2, H / 2 + 60);
     ctx.textAlign = 'start';
   }
 }
