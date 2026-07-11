@@ -419,77 +419,70 @@ function render() {
 
   // 背景：空（水色グラデーション）
   const skyGrad = ctx.createLinearGradient(0, 0, 0, skyHeight);
-  skyGrad.addColorStop(0, '#4facfe');
-  skyGrad.addColorStop(1, '#00f2fe');
+  skyGrad.addColorStop(0, '#87CEEB');
+  skyGrad.addColorStop(1, '#E0F7FA');
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, W, skyHeight);
   
   // 地下背景
-  ctx.fillStyle = '#0a0a0c';
+  ctx.fillStyle = '#050508';
   ctx.fillRect(0, skyHeight, W, H - skyHeight);
 
-  // 地形：タイルごとの質感
+  // 地形描画
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       const c = game.map[x] && game.map[x][y];
       if (!c) continue;
       const sx = x * TILE, sy = y * TILE;
       if (c.wall) {
+        ctx.fillStyle = '#1a1a24';
+        ctx.fillRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
+        ctx.strokeStyle = '#333344';
+        ctx.strokeRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
         ctx.fillStyle = '#2a2a35';
-        ctx.fillRect(sx + 1, sy + 1, TILE - 2, TILE - 2);
-        ctx.strokeStyle = '#3d3d4d';
-        ctx.strokeRect(sx + 4, sy + 4, TILE - 8, TILE - 8);
-        // 岩肌のノイズ
-        ctx.fillStyle = '#3a3a45';
-        ctx.fillRect(sx + TILE/3, sy + TILE/3, TILE/3, TILE/3);
+        ctx.fillRect(sx + TILE/4, sy + TILE/4, TILE/2, TILE/2);
       } else {
-        ctx.fillStyle = '#121215';
+        ctx.fillStyle = '#0a0a0c';
         ctx.fillRect(sx, sy, TILE, TILE);
-        ctx.strokeStyle = '#1e1e25';
+        ctx.strokeStyle = '#121218';
         ctx.strokeRect(sx, sy, TILE, TILE);
       }
     }
   }
 
-  // 採掘ハイライト：脈動するインジケーター
+  // 採掘インジケーター
   if (game.phase === 'dig' && game.digsLeft > 0) {
-    const pulse = (Math.sin(now / 150) + 1) / 2;
+    const pulse = (Math.sin(now / 200) + 1) / 2;
     [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
       const tx = game.player.x + dx, ty = game.player.y + dy;
-      if (isWall(tx, ty)) {
-        ctx.shadowBlur = 10 * pulse;
-        ctx.shadowColor = '#fff';
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.3 + pulse * 0.5})`;
-        ctx.lineWidth = 4;
-        ctx.strokeRect(tx * TILE + 6, ty * TILE + 6, TILE - 12, TILE - 12);
+      if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS && game.map[tx][ty].wall) {
+        ctx.shadowBlur = 15 * pulse;
+        ctx.shadowColor = '#00f2fe';
+        ctx.strokeStyle = `rgba(0, 242, 254, ${0.4 + pulse * 0.4})`;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(tx * TILE + 4, ty * TILE + 4, TILE - 8, TILE - 8);
         ctx.shadowBlur = 0;
       }
     });
   }
 
-  // 魔物：種族別ビジュアル
+  // 魔物
   game.monsters.forEach(m => {
     const cx = m.x * TILE + TILE / 2, cy = m.y * TILE + TILE / 2;
-    const bounce = Math.sin(now / 150 + m.id) * 4;
+    const bounce = Math.sin(now / 200 + m.id) * 3;
     ctx.save();
-    if (m.type === 1) { // 攻撃的
+    if (m.type === 1) {
       ctx.fillStyle = '#ff4757';
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - 12 + bounce); ctx.lineTo(cx + 10, cy + 8 + bounce); ctx.lineTo(cx - 10, cy + 8 + bounce);
-      ctx.fill();
-    } else if (m.type === 2) { // 成長型
+      ctx.beginPath(); ctx.moveTo(cx, cy - 10 + bounce); ctx.lineTo(cx + 8, cy + 8 + bounce); ctx.lineTo(cx - 8, cy + 8 + bounce); ctx.fill();
+    } else if (m.type === 2) {
       ctx.fillStyle = '#2ed573';
-      ctx.beginPath();
-      ctx.arc(cx, cy + bounce, 8, 0, Math.PI * 2);
-      ctx.fill();
-    } else { // その他
+      ctx.beginPath(); ctx.arc(cx, cy + bounce, 7, 0, Math.PI * 2); ctx.fill();
+    } else {
       ctx.fillStyle = '#1e90ff';
-      ctx.fillRect(cx - 7, cy - 7 + bounce, 14, 14);
+      ctx.fillRect(cx - 6, cy - 6 + bounce, 12, 12);
     }
-    if (m.justFed) { // 捕食エフェクト
-      ctx.strokeStyle = '#ffd700';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(cx - 12, cy - 12 + bounce, 24, 24);
+    if (m.justFed) {
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(cx - 10, cy - 10 + bounce, 20, 20);
     }
     ctx.restore();
   });
@@ -498,43 +491,37 @@ function render() {
   game.heroes.forEach(h => {
     const hx = h.x * TILE, hy = h.y * TILE;
     ctx.fillStyle = '#f1c40f';
-    ctx.beginPath();
-    ctx.arc(hx + TILE/2, hy + TILE/2, TILE/3, 0, Math.PI*2);
-    ctx.fill();
-    // HPバー
-    const hpRatio = h.hp / h.maxHp;
-    ctx.fillStyle = '#333'; ctx.fillRect(hx + 5, hy - 10, TILE - 10, 5);
+    ctx.beginPath(); ctx.arc(hx + TILE/2, hy + TILE/2, TILE/3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#333'; ctx.fillRect(hx + 5, hy - 8, TILE - 10, 4);
     ctx.fillStyle = '#e74c3c';
-    ctx.fillRect(hx + 5, hy - 10, (TILE - 10) * hpRatio, 5);
+    ctx.fillRect(hx + 5, hy - 8, (TILE - 10) * (h.hp / h.maxHp), 4);
   });
 
   // 魔王
   ctx.save();
-  ctx.shadowBlur = 25; ctx.shadowColor = '#00d2ff';
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2, 12, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.shadowBlur = 20; ctx.shadowColor = '#4facfe';
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2, 10, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
   // HUD
-  ctx.fillStyle = '#1a1a2e';
+  ctx.fillStyle = 'rgba(0,0,0,0.8)';
   ctx.fillRect(0, H, W, 60);
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 22px "Segoe UI", sans-serif';
-  ctx.fillText(`STAGE: ${game.stageLevel} | ROUND: ${game.round} | DIGS: ${game.digsLeft}`, 20, H + 40);
+  ctx.font = 'bold 20px Arial';
+  ctx.fillText(`STAGE: ${game.stageLevel} | ROUND: ${game.round} | DIGS: ${game.digsLeft}`, 20, H + 38);
 
   // 演出
   if (game.gameOver || game.victory) {
-    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    ctx.fillStyle = 'rgba(0,0,0,0.9)';
     ctx.fillRect(0, 0, W, H + 60);
     ctx.fillStyle = game.victory ? '#ffd700' : '#ff4757';
-    ctx.font = 'bold 60px "Impact", sans-serif';
+    ctx.font = 'bold 50px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(game.victory ? 'LEVEL CLEAR' : 'DUNGEON COLLAPSED', W / 2, H / 2);
-    ctx.font = '24px Arial';
+    ctx.fillText(game.victory ? 'STAGE CLEAR' : 'GAME OVER', W / 2, H / 2);
+    ctx.font = '20px Arial';
     ctx.fillStyle = '#fff';
-    ctx.fillText('PRESS SPACE TO CONTINUE', W / 2, H / 2 + 60);
+    ctx.fillText('PRESS SPACE TO CONTINUE', W / 2, H / 2 + 50);
     ctx.textAlign = 'start';
   }
 }
