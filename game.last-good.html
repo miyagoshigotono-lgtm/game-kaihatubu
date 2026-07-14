@@ -414,113 +414,120 @@ function spawnHeroesForStage(round) {
 // ===SECTION:RENDER===
 function render() {
   const W = COLS * TILE, H = ROWS * TILE;
-  const headerH = TILE * 2;
+  const headerH = 80;
   const now = Date.now();
 
-  // 1. 背景描画：深淵の演出
   ctx.fillStyle = '#050508';
-  ctx.fillRect(0, 0, W, H + headerH + 60);
+  ctx.fillRect(0, 0, W, H + headerH);
 
-  // 2. 地形描画：掘削感と奥行きのある迷宮
+  // 1. 地形描画：重厚な壁と深みのある通路
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       const c = game.map[x] && game.map[x][y];
       if (!c) continue;
       const sx = x * TILE, sy = y * TILE + headerH;
+      
       if (c.wall) {
-        // 壁：硬質で重厚な質感
         ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(sx, sy, TILE, TILE);
         ctx.strokeStyle = '#252540';
-        ctx.strokeRect(sx, sy, TILE, TILE);
+        ctx.strokeRect(sx + 0.5, sy + 0.5, TILE, TILE);
         ctx.fillStyle = '#2d2d3e';
-        ctx.fillRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
+        ctx.fillRect(sx + 4, sy + 4, TILE - 8, TILE - 8);
       } else {
-        // 通路：土の質感
-        ctx.fillStyle = '#0f0f1a';
+        ctx.fillStyle = '#0a0a12';
         ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.fillStyle = '#151522';
+        ctx.fillRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
       }
     }
   }
 
-  // 3. 採掘可能範囲：パルスするガイド
+  // 2. 採掘可能範囲：脈動するインジケーター
   if (game.phase === 'dig' && game.digsLeft > 0) {
-    const pulse = (Math.sin(now / 200) + 1) / 2;
+    const pulse = (Math.sin(now / 300) + 1) / 2;
     [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
       const tx = game.player.x + dx, ty = game.player.y + dy;
       if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS && game.map[tx][ty].wall) {
-        ctx.strokeStyle = `rgba(0, 255, 200, ${0.3 + pulse * 0.5})`;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(tx * TILE + 4, ty * TILE + 4 + headerH, TILE - 8, TILE - 8);
+        ctx.strokeStyle = `rgba(0, 255, 200, ${0.4 + pulse * 0.4})`;
+        ctx.lineWidth = 4;
+        ctx.strokeRect(tx * TILE + 6, ty * TILE + 6 + headerH, TILE - 12, TILE - 12);
       }
     });
   }
 
-  // 4. 魔物描画：個体ごとの生物的表現と捕食エフェクト
+  // 3. 魔物描画：種族ごとの固有形状と捕食演出
   game.monsters.forEach(m => {
     const cx = m.x * TILE + TILE / 2, cy = m.y * TILE + TILE / 2 + headerH;
-    const wobble = Math.sin(now / 200 + m.id) * 4;
+    const wobble = Math.sin(now / 150 + m.id) * 3;
     
     ctx.save();
-    if (m.type === 1) { // 捕食者：鋭利な赤
+    if (m.type === 1) { // 捕食者：鋭利な三角形
       ctx.fillStyle = '#ff4757';
-      ctx.beginPath(); ctx.moveTo(cx, cy-10+wobble); ctx.lineTo(cx+10, cy+10+wobble); ctx.lineTo(cx-10, cy+10+wobble); ctx.fill();
-    } else if (m.type === 2) { // 捕食される側：柔らかい緑
+      ctx.beginPath(); ctx.moveTo(cx, cy-12+wobble); ctx.lineTo(cx+12, cy+10+wobble); ctx.lineTo(cx-12, cy+10+wobble); ctx.fill();
+    } else if (m.type === 2) { // 捕食される側：柔らかい円
       ctx.fillStyle = '#2ed573';
-      ctx.beginPath(); ctx.arc(cx, cy+wobble, 6, 0, Math.PI*2); ctx.fill();
-    } else { // 中立：青
+      ctx.beginPath(); ctx.arc(cx, cy+wobble, 8, 0, Math.PI*2); ctx.fill();
+    } else { // 中立：四角形
       ctx.fillStyle = '#1e90ff';
-      ctx.fillRect(cx-5, cy-5+wobble, 10, 10);
+      ctx.fillRect(cx-7, cy-7+wobble, 14, 14);
     }
     
-    if (m.justFed) { // 捕食演出
+    if (m.justFed) {
       ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(cx, cy, 15 + Math.sin(now/50)*5, 0, Math.PI*2);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, 18 + Math.sin(now/50)*5, 0, Math.PI*2);
       ctx.stroke();
     }
     ctx.restore();
   });
 
-  // 5. 勇者描画：侵入者
+  // 4. 勇者描画：光り輝く騎士
   game.heroes.forEach(h => {
     const hx = h.x * TILE, hy = h.y * TILE + headerH;
-    // 勇者本体
+    ctx.shadowBlur = 10; ctx.shadowColor = '#f1c40f';
     ctx.fillStyle = '#f1c40f';
-    ctx.beginPath(); ctx.arc(hx+TILE/2, hy+TILE/2, 12, 0, Math.PI*2); ctx.fill();
-    // HPバー
+    ctx.beginPath(); ctx.arc(hx+TILE/2, hy+TILE/2, 10, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.fillStyle = '#333';
-    ctx.fillRect(hx+2, hy-8, TILE-4, 4);
+    ctx.fillRect(hx+4, hy-10, TILE-8, 5);
     ctx.fillStyle = '#e74c3c';
-    ctx.fillRect(hx+2, hy-8, (TILE-4)*(h.hp/h.maxHp), 4);
+    ctx.fillRect(hx+4, hy-10, (TILE-8)*(h.hp/h.maxHp), 5);
   });
 
-  // 6. 魔王描画：光源
+  // 5. 魔王描画
   ctx.save();
-  ctx.shadowBlur = 20; ctx.shadowColor = '#00d2ff';
+  ctx.shadowBlur = 25; ctx.shadowColor = '#00d2ff';
   ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(game.player.x*TILE + TILE/2, game.player.y*TILE + TILE/2 + headerH, 6, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(game.player.x*TILE + TILE/2, game.player.y*TILE + TILE/2 + headerH, 8, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 
-  // 7. HUD：UIレイアウト
-  ctx.fillStyle = '#111';
+  // 6. HUD：洗練された情報表示
+  ctx.fillStyle = '#0f0f1a';
   ctx.fillRect(0, 0, W, headerH);
+  ctx.strokeStyle = '#252540';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, W, headerH);
+  
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 20px "Courier New"';
-  ctx.fillText(`STAGE:${game.stageLevel}  ROUND:${game.round}`, 20, 35);
-  ctx.fillText(`DIGS:${game.digsLeft}`, 20, 65);
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 24px "Segoe UI", sans-serif';
+  ctx.fillText(`STAGE: ${game.stageLevel}`, 30, 48);
+  ctx.fillText(`ROUND: ${game.round}`, 200, 48);
+  ctx.fillStyle = '#00d2ff';
+  ctx.fillText(`DIGS: ${game.digsLeft}`, 400, 48);
 
-  // 8. 演出：ゲーム終了
+  // 7. 終了演出
   if (game.gameOver || game.victory) {
-    ctx.fillStyle = 'rgba(0,0,0,0.9)';
-    ctx.fillRect(0, 0, W, H + headerH + 60);
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    ctx.fillRect(0, 0, W, H + headerH);
     ctx.fillStyle = game.victory ? '#ffd700' : '#ff4757';
     ctx.textAlign = 'center';
-    ctx.font = 'bold 40px Arial';
+    ctx.font = 'bold 60px "Impact", sans-serif';
     ctx.fillText(game.victory ? 'LEVEL CLEAR' : 'DUNGEON COLLAPSED', W/2, (H+headerH)/2);
-    ctx.fillStyle = '#aaa';
-    ctx.font = '16px Arial';
-    ctx.fillText('PRESS SPACE TO CONTINUE', W/2, (H+headerH)/2 + 50);
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px Arial';
+    ctx.fillText('PRESS SPACE TO CONTINUE', W/2, (H+headerH)/2 + 60);
   }
 }
 // ===END:RENDER===
