@@ -420,7 +420,7 @@ function render() {
   ctx.fillStyle = '#050508';
   ctx.fillRect(0, 0, W, H + headerH);
 
-  // 1. 地形描画：地層の奥行きを強調
+  // 1. 地形描画：地層の深みと質感の強化
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       const c = game.map[x] && game.map[x][y];
@@ -431,102 +431,111 @@ function render() {
         ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(sx, sy, TILE, TILE);
         ctx.strokeStyle = '#2d2d4a';
-        ctx.strokeRect(sx, sy, TILE, TILE);
+        ctx.strokeRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
         ctx.fillStyle = '#252540';
-        ctx.fillRect(sx + 6, sy + 6, TILE - 12, TILE - 12);
+        ctx.fillRect(sx + 8, sy + 8, TILE - 16, TILE - 16);
       } else {
-        ctx.fillStyle = '#0a0a12';
+        ctx.fillStyle = '#080810';
         ctx.fillRect(sx, sy, TILE, TILE);
-        ctx.strokeStyle = '#151525';
+        ctx.strokeStyle = '#121220';
         ctx.strokeRect(sx, sy, TILE, TILE);
+        ctx.fillStyle = '#151525';
+        ctx.beginPath(); ctx.arc(sx + TILE/2, sy + TILE/2, 2, 0, Math.PI * 2); ctx.fill();
       }
     }
   }
 
-  // 2. 採掘可能範囲：脈動するインジケーター
+  // 2. 採掘可能範囲：脈動するサイバーなガイド
   if (game.phase === 'dig' && game.digsLeft > 0) {
-    const pulse = (Math.sin(now / 300) + 1) / 2;
+    const pulse = (Math.sin(now / 200) + 1) / 2;
     [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
       const tx = game.player.x + dx, ty = game.player.y + dy;
       if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS && game.map[tx][ty].wall) {
-        ctx.strokeStyle = `rgba(100, 255, 255, ${0.4 + pulse * 0.4})`;
-        ctx.lineWidth = 4;
-        ctx.strokeRect(tx * TILE + 8, ty * TILE + 8 + headerH, TILE - 16, TILE - 16);
+        ctx.strokeStyle = `rgba(0, 240, 255, ${0.3 + pulse * 0.5})`;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeRect(tx * TILE + 4, ty * TILE + 4 + headerH, TILE - 8, TILE - 8);
+        ctx.setLineDash([]);
       }
     });
   }
 
-  // 3. 魔物描画：0.5秒補間・種族別デザイン
+  // 3. 魔物描画：0.5秒補間・生態系エフェクト
   game.monsters.forEach(m => {
     const progress = Math.min((now - m.lastMoveTime) / 500, 1);
     const renderX = (m.prevX + (m.x - m.prevX) * progress) * TILE + TILE / 2;
     const renderY = (m.prevY + (m.y - m.prevY) * progress) * TILE + TILE / 2 + headerH;
     
     ctx.save();
-    const breathe = Math.sin(now / 300) * 3;
-    ctx.shadowBlur = 10;
-    if (m.type === 1) { // 捕食者タイプ
-      ctx.fillStyle = '#ff4757';
-      ctx.shadowColor = '#ff4757';
+    const breathe = Math.sin(now / 200) * 2;
+    ctx.shadowBlur = 15;
+    if (m.type === 1) { 
+      ctx.fillStyle = '#ff3838';
+      ctx.shadowColor = '#ff3838';
       ctx.beginPath();
-      ctx.moveTo(renderX, renderY - 12 + breathe);
-      ctx.lineTo(renderX + 10, renderY + 8 + breathe);
-      ctx.lineTo(renderX - 10, renderY + 8 + breathe);
-      ctx.fill();
-    } else { // 捕食されるタイプ
-      ctx.fillStyle = '#2ed573';
-      ctx.shadowColor = '#2ed573';
-      ctx.beginPath(); ctx.arc(renderX, renderY + breathe, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.moveTo(renderX, renderY - 14 + breathe);
+      ctx.lineTo(renderX + 12, renderY + 10 + breathe);
+      ctx.lineTo(renderX - 12, renderY + 10 + breathe);
+      ctx.closePath(); ctx.fill();
+    } else {
+      ctx.fillStyle = '#0be881';
+      ctx.shadowColor = '#0be881';
+      ctx.beginPath(); ctx.arc(renderX, renderY + breathe, 7, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   });
 
-  // 4. 勇者描画：HPバー付き
+  // 4. 勇者描画：HPバーと脅威の演出
   game.heroes.forEach(h => {
     const hx = h.x * TILE + TILE/2, hy = h.y * TILE + TILE/2 + headerH;
-    ctx.fillStyle = '#f1c40f';
-    ctx.shadowBlur = 15; ctx.shadowColor = '#f1c40f';
-    ctx.beginPath(); ctx.arc(hx, hy, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.shadowBlur = 20; ctx.shadowColor = '#f1c40f';
+    ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.fill();
     
     ctx.shadowBlur = 0;
-    ctx.fillStyle = '#333';
-    ctx.fillRect(hx - 12, hy - 25, 24, 6);
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillRect(hx - 11, hy - 24, 22 * (h.hp / h.maxHp), 4);
+    ctx.fillStyle = '#222';
+    ctx.fillRect(hx - 14, hy - 28, 28, 6);
+    ctx.fillStyle = h.hp > h.maxHp * 0.5 ? '#2ecc71' : '#e74c3c';
+    ctx.fillRect(hx - 13, hy - 27, 26 * (h.hp / h.maxHp), 4);
   });
 
-  // 5. 魔王描画
+  // 5. 魔王描画：コアの輝き
   ctx.save();
-  ctx.shadowBlur = 25; ctx.shadowColor = '#00d2ff';
+  ctx.shadowBlur = 30; ctx.shadowColor = '#00f2ff';
   ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2 + headerH, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2 + headerH, 12, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 
-  // 6. HUD：洗練された上部レイアウト
+  // 6. HUD：情報集約レイアウト
   ctx.fillStyle = '#0f0f1a';
   ctx.fillRect(0, 0, W, headerH);
-  ctx.strokeStyle = '#2d2d4a';
+  ctx.strokeStyle = '#3d3d6a';
   ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, W, headerH);
   
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 24px Arial';
-  ctx.fillText(`STAGE: ${game.stageLevel}`, 30, 45);
-  ctx.fillText(`ROUND: ${game.round}`, 180, 45);
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 20px "Segoe UI", sans-serif';
+  ctx.fillText(`STAGE: ${game.stageLevel}`, 20, 35);
+  ctx.fillText(`ROUND: ${game.round}`, 20, 65);
   
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#00d2ff';
-  ctx.font = 'bold 28px Impact';
-  ctx.fillText(`DIGS: ${game.digsLeft}`, W - 30, 48);
+  ctx.fillStyle = '#00f2ff';
+  ctx.font = 'bold 36px Impact';
+  ctx.fillText(`DIGS: ${game.digsLeft}`, W - 20, 52);
 
   // 7. 終了演出
   if (game.gameOver || game.victory) {
-    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    ctx.fillStyle = 'rgba(0,0,0,0.9)';
     ctx.fillRect(0, 0, W, H + headerH);
-    ctx.fillStyle = game.victory ? '#ffd700' : '#ff4757';
+    ctx.fillStyle = game.victory ? '#fff' : '#ff4757';
     ctx.textAlign = 'center';
-    ctx.font = 'bold 72px Impact';
-    ctx.fillText(game.victory ? 'VICTORY' : 'DEFEATED', W / 2, (H + headerH) / 2);
+    ctx.font = 'bold 64px Impact';
+    ctx.fillText(game.victory ? 'LEVEL CLEAR' : 'DUNGEON COLLAPSED', W / 2, (H + headerH) / 2);
+    ctx.font = '24px Arial';
+    ctx.fillText('Press R to Restart', W / 2, (H + headerH) / 2 + 60);
   }
 }
 // ===END:RENDER===
