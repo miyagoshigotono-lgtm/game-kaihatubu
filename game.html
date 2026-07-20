@@ -414,10 +414,10 @@ function spawnHeroesForStage(round) {
 // ===SECTION:RENDER===
 function render() {
   const W = COLS * TILE, H = ROWS * TILE;
-  const headerH = 100;
+  const headerH = 80;
   const now = Date.now();
 
-  ctx.fillStyle = '#080810';
+  ctx.fillStyle = '#050508';
   ctx.fillRect(0, 0, W, H + headerH);
 
   // 1. 地形描画 (深みのあるグリッド)
@@ -425,27 +425,23 @@ function render() {
     for (let y = 0; y < ROWS; y++) {
       const sx = x * TILE, sy = y * TILE + headerH;
       const tile = game.map[x][y];
-      ctx.fillStyle = tile.wall ? '#151525' : '#05050a';
+      ctx.fillStyle = tile.wall ? '#121220' : '#0a0a15';
       ctx.fillRect(sx, sy, TILE, TILE);
-      if (tile.wall) {
-        ctx.strokeStyle = '#202040';
-        ctx.strokeRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
-      } else {
-        ctx.strokeStyle = '#101020';
-        ctx.strokeRect(sx, sy, TILE, TILE);
-      }
+      
+      ctx.strokeStyle = tile.wall ? '#1a1a30' : '#151525';
+      ctx.strokeRect(sx, sy, TILE, TILE);
     }
   }
 
   // 2. 採掘ガイド
   if (game.phase === 'dig' && game.digsLeft > 0) {
-    const pulse = Math.sin(now / 400) * 0.4 + 0.6;
+    const pulse = Math.sin(now / 300) * 0.3 + 0.7;
     [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
       const tx = game.player.x + dx, ty = game.player.y + dy;
       if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS && game.map[tx][ty].wall) {
-        ctx.strokeStyle = `rgba(150, 230, 255, ${pulse})`;
-        ctx.lineWidth = 4;
-        ctx.strokeRect(tx * TILE + 6, ty * TILE + 6 + headerH, TILE - 12, TILE - 12);
+        ctx.strokeStyle = `rgba(100, 200, 255, ${pulse})`;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(tx * TILE + 4, ty * TILE + 4 + headerH, TILE - 8, TILE - 8);
       }
     });
   }
@@ -457,62 +453,63 @@ function render() {
     const ry = (prevY + (y - prevY) * progress) * TILE + TILE / 2 + headerH;
     
     ctx.save();
-    ctx.shadowBlur = 15;
+    ctx.shadowBlur = 10;
     ctx.shadowColor = color;
     ctx.fillStyle = color;
     
     if (type === 'hero') {
       ctx.beginPath();
-      ctx.moveTo(rx, ry - 14); ctx.lineTo(rx + 12, ry + 10); ctx.lineTo(rx - 12, ry + 10);
+      ctx.moveTo(rx, ry - 12); ctx.lineTo(rx + 10, ry + 8); ctx.lineTo(rx - 10, ry + 8);
       ctx.fill();
       if (hp !== null) {
-        ctx.fillStyle = '#333'; ctx.fillRect(rx - 16, ry - 28, 32, 6);
-        ctx.fillStyle = '#e74c3c'; ctx.fillRect(rx - 16, ry - 28, 32 * (hp / maxHp), 6);
+        ctx.fillStyle = '#222'; ctx.fillRect(rx - 14, ry - 22, 28, 4);
+        ctx.fillStyle = '#ff4444'; ctx.fillRect(rx - 14, ry - 22, 28 * (hp / maxHp), 4);
       }
     } else {
       ctx.beginPath();
-      ctx.arc(rx, ry, 7, 0, Math.PI * 2);
+      ctx.arc(rx, ry, 6, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
   };
 
-  game.monsters.forEach(m => drawEntity(m.x, m.y, m.prevX, m.prevY, m.lastMoveTime, m.type === 1 ? '#ff5555' : '#55ff99', 'monster'));
-  game.heroes.forEach(h => drawEntity(h.x, h.y, h.prevX, h.prevY, h.lastMoveTime, '#f1c40f', 'hero', h.hp, h.maxHp));
+  game.monsters.forEach(m => drawEntity(m.x, m.y, m.prevX, m.prevY, m.lastMoveTime, m.type === 1 ? '#ff4444' : '#44ff88', 'monster'));
+  game.heroes.forEach(h => drawEntity(h.x, h.y, h.prevX, h.prevY, h.lastMoveTime, '#ffd700', 'hero', h.hp, h.maxHp));
 
   // 4. 魔王描画
   ctx.save();
-  ctx.shadowBlur = 30; ctx.shadowColor = '#fff';
+  ctx.shadowBlur = 20; ctx.shadowColor = '#fff';
   ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2 + headerH, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2 + headerH, 8, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
   // 5. HUD (上部レイアウト)
-  ctx.fillStyle = '#11111a';
+  ctx.fillStyle = '#0f0f1a';
   ctx.fillRect(0, 0, W, headerH);
-  ctx.strokeStyle = '#333';
+  ctx.strokeStyle = '#2a2a40';
   ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, W, headerH);
   
   ctx.fillStyle = '#fff';
+  ctx.font = 'bold 24px "Segoe UI", sans-serif';
   ctx.textAlign = 'left';
-  ctx.font = 'bold 32px "Segoe UI", sans-serif';
-  ctx.fillText(`STAGE: ${game.stageLevel}`, 30, 60);
+  ctx.fillText(`STAGE: ${game.stageLevel}`, 20, 48);
+  
   ctx.textAlign = 'right';
   ctx.fillStyle = game.digsLeft > 0 ? '#4da6ff' : '#666';
-  ctx.fillText(`掘削可能: ${game.digsLeft}`, W - 30, 60);
+  ctx.fillText(`掘削可能: ${game.digsLeft}`, W - 20, 48);
 
   // 6. 終了演出
   if (game.gameOver || game.victory) {
-    ctx.fillStyle = 'rgba(0,0,0,0.9)';
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(0, 0, W, H + headerH);
-    ctx.fillStyle = game.victory ? '#55ff99' : '#ff5555';
+    ctx.fillStyle = game.victory ? '#44ff88' : '#ff4444';
     ctx.textAlign = 'center';
-    ctx.font = 'bold 80px "Impact", sans-serif';
-    ctx.fillText(game.victory ? 'LEVEL CLEAR' : 'DUNGEON COLLAPSED', W / 2, (H + headerH) / 2);
+    ctx.font = 'bold 60px Impact, sans-serif';
+    ctx.fillText(game.victory ? 'STAGE CLEAR' : 'DUNGEON COLLAPSED', W / 2, (H + headerH) / 2);
     ctx.fillStyle = '#fff';
-    ctx.font = '28px Arial';
-    ctx.fillText('Press [R] to Continue', W / 2, (H + headerH) / 2 + 70);
+    ctx.font = '20px Arial';
+    ctx.fillText('Press [R] to Continue', W / 2, (H + headerH) / 2 + 50);
   }
 }
 // ===END:RENDER===
