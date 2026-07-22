@@ -414,108 +414,114 @@ function spawnHeroesForStage(round) {
 // ===SECTION:RENDER===
 function render() {
   const W = COLS * TILE, H = ROWS * TILE;
-  const headerH = 60;
+  const headerH = 80;
   const now = Date.now();
 
   ctx.fillStyle = '#050508';
   ctx.fillRect(0, 0, W, H + headerH);
 
-  // 1. 地形描画
+  // 1. 地形描画 (グリッド感の演出)
   for (let x = 0; x < COLS; x++) {
     for (let y = 0; y < ROWS; y++) {
       const sx = x * TILE, sy = y * TILE + headerH;
       const tile = game.map[x][y];
-      ctx.fillStyle = tile.wall ? '#1a1a2e' : '#0a0a15';
+      ctx.fillStyle = tile.wall ? '#12121a' : '#0a0a12';
       ctx.fillRect(sx, sy, TILE, TILE);
-      if (!tile.wall) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      if (tile.wall) {
+        ctx.fillStyle = '#1e1e2e';
+        ctx.fillRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
+      } else {
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
         ctx.strokeRect(sx, sy, TILE, TILE);
       }
     }
   }
 
-  // 2. 採掘ガイド
+  // 2. 採掘ガイド (魔王周辺の視認性向上)
   if (game.phase === 'dig' && game.digsLeft > 0) {
-    const pulse = Math.sin(now / 300) * 0.3 + 0.7;
+    const pulse = Math.sin(now / 200) * 0.4 + 0.6;
     [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
       const tx = game.player.x + dx, ty = game.player.y + dy;
       if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS && game.map[tx][ty].wall) {
-        ctx.strokeStyle = `rgba(100, 200, 255, ${pulse})`;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(tx * TILE + 6, ty * TILE + 6 + headerH, TILE - 12, TILE - 12);
+        ctx.strokeStyle = `rgba(150, 230, 255, ${pulse})`;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(tx * TILE + 4, ty * TILE + 4 + headerH, TILE - 8, TILE - 8);
       }
     });
   }
 
-  // 3. エンティティ描画 (0.5秒補間)
+  // 3. エンティティ描画 (0.5秒補間・魔王同期)
   const drawEntity = (x, y, prevX, prevY, lastMoveTime, color, type, hp = null, maxHp = null) => {
     const progress = Math.min((now - lastMoveTime) / 500, 1);
     const rx = (prevX + (x - prevX) * progress) * TILE + TILE / 2;
     const ry = (prevY + (y - prevY) * progress) * TILE + TILE / 2 + headerH;
     
     ctx.save();
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 15;
     ctx.shadowColor = color;
     ctx.fillStyle = color;
     
     if (type === 'hero') {
       ctx.beginPath();
-      ctx.moveTo(rx, ry - 10); ctx.lineTo(rx + 8, ry + 6); ctx.lineTo(rx - 8, ry + 6);
+      ctx.moveTo(rx, ry - 12); ctx.lineTo(rx + 10, ry + 8); ctx.lineTo(rx - 10, ry + 8);
       ctx.fill();
       if (hp !== null) {
-        ctx.fillStyle = '#333'; ctx.fillRect(rx - 10, ry - 18, 20, 3);
-        ctx.fillStyle = '#ff3333'; ctx.fillRect(rx - 10, ry - 18, 20 * (hp / maxHp), 3);
+        ctx.fillStyle = '#222'; ctx.fillRect(rx - 12, ry - 22, 24, 4);
+        ctx.fillStyle = '#ff4444'; ctx.fillRect(rx - 12, ry - 22, 24 * (hp / maxHp), 4);
       }
     } else {
       ctx.beginPath();
-      ctx.arc(rx, ry, 5, 0, Math.PI * 2);
+      ctx.arc(rx, ry, 6, 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
     ctx.restore();
   };
 
-  game.monsters.forEach(m => drawEntity(m.x, m.y, m.prevX, m.prevY, m.lastMoveTime, m.type === 1 ? '#ff4444' : '#44ffaa', 'monster'));
+  game.monsters.forEach(m => drawEntity(m.x, m.y, m.prevX, m.prevY, m.lastMoveTime, m.type === 1 ? '#ff5555' : '#55ffaa', 'monster'));
   game.heroes.forEach(h => drawEntity(h.x, h.y, h.prevX, h.prevY, h.lastMoveTime, '#ffcc00', 'hero', h.hp, h.maxHp));
 
   // 4. 魔王描画
   ctx.save();
-  ctx.shadowBlur = 15; ctx.shadowColor = '#fff';
+  ctx.shadowBlur = 20; ctx.shadowColor = '#fff';
   ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2 + headerH, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(game.player.x * TILE + TILE / 2, game.player.y * TILE + TILE / 2 + headerH, 8, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
-  // 5. HUD (上部レイアウト：横並び)
-  ctx.fillStyle = '#0f0f15';
+  // 5. HUD (洗練されたUI)
+  ctx.fillStyle = '#080810';
   ctx.fillRect(0, 0, W, headerH);
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, W, headerH);
   
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 18px "Orbitron", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(`STAGE - ${game.stageLevel}`, W / 2, 35);
+  ctx.font = 'bold 24px "Orbitron", sans-serif';
+  ctx.fillText(`STAGE: ${game.stageLevel}`, W / 2, 35);
   
   ctx.font = '14px Arial';
   ctx.textAlign = 'left';
-  ctx.fillStyle = '#4da6ff';
-  ctx.fillText(`掘削: ${game.digsLeft}`, 20, 35);
+  ctx.fillStyle = '#88ccff';
+  ctx.fillText(`掘削可能回数: ${game.digsLeft}`, 20, 65);
   
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#ffaa00';
-  ctx.fillText(`侵入者: ${game.heroes.length}`, W - 20, 35);
+  ctx.fillStyle = '#ffaa44';
+  ctx.fillText(`侵入者数: ${game.heroes.length}`, W - 20, 65);
 
   // 6. 終了演出
   if (game.gameOver || game.victory) {
-    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(0, 0, W, H + headerH);
     ctx.fillStyle = game.victory ? '#44ff88' : '#ff4444';
     ctx.textAlign = 'center';
-    ctx.font = 'bold 36px "Impact"';
-    ctx.fillText(game.victory ? 'VICTORY' : 'DEFEATED', W / 2, (H + headerH) / 2);
-    ctx.fillStyle = '#fff';
-    ctx.font = '16px Arial';
-    ctx.fillText('Press [R] to Restart', W / 2, (H + headerH) / 2 + 40);
+    ctx.font = 'bold 48px "Impact"';
+    ctx.fillText(game.victory ? 'DUNGEON CLEARED' : 'DUNGEON COLLAPSED', W / 2, (H + headerH) / 2);
+    ctx.fillStyle = '#ddd';
+    ctx.font = '20px Arial';
+    ctx.fillText('Press [R] to Restart', W / 2, (H + headerH) / 2 + 50);
   }
 }
 // ===END:RENDER===
